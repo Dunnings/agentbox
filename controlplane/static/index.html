@@ -5,13 +5,12 @@
 <title>agentbox</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="/static/common.css">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&display=swap">
 <script src="/static/settings.js"></script>
 <style>
-  /* Base reset, body, and --sans/--mono tokens live in common.css.
-     Homepage uses Google's Roboto for everything — override both tokens. */
+  /* Base reset, body, and --sans/--mono tokens live in common.css, which also
+     self-hosts the Roboto @font-face. The homepage uses Roboto for everything —
+     body copy and the monospaced session names alike — so put it first in both
+     tokens. No CDN: the bundled /static/fonts/Roboto-variable.woff2 is used. */
   :root {
     --sans: "Roboto", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Cantarell, "Noto Sans", sans-serif;
     --mono: "Roboto", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Cantarell, "Noto Sans", sans-serif;

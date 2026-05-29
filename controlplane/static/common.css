@@ -1,4 +1,20 @@
 /* Base reset + typography tokens — shared by every control-plane page. */
+
+/* Self-hosted Roboto (variable weight, latin subset, Apache-2.0). Served from
+   /static so the UI always has a real sans to render — including minimal Linux
+   and offline viewers that have no system sans-serif installed and would
+   otherwise fall through to the browser's default serif (Times New Roman).
+   Roboto already sits in the --sans stack below; bundling the bytes makes that
+   fallback actually resolve. No third-party CDN — keeps the control plane
+   self-contained and leaks nothing to fonts.googleapis.com on every load. */
+@font-face {
+  font-family: "Roboto";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/static/fonts/Roboto-variable.woff2") format("woff2");
+}
+
 :root {
   --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Cantarell, Ubuntu, "Noto Sans", sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", "Liberation Mono", "Roboto Mono", "Noto Sans Mono", monospace;
