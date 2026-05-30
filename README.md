@@ -1,5 +1,9 @@
 # agentbox
 
+<div align="center">
+  <img src="preview.png" alt="preview" />
+</div>
+
 A sandboxed Linux container with a browser-based tmux control plane. Spawn,
 attach to, and kill long-running terminal sessions from any browser. The
 sessions survive when you close the tab. Built originally for driving Claude
@@ -20,6 +24,7 @@ builds, REPLs, training jobs, an SSH-replacement on a home server.
 - **Authenticated remote access.** A built-in password login (signed 24h
   cookie) or a Cloudflare Tunnel + Access setup gets you to it from anywhere
   without opening a port on your network.
+
 
 ## Quickstart
 
