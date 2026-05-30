@@ -114,6 +114,19 @@ def _safe_next(dest: str) -> str:
 
 
 @app.middleware("http")
+async def no_cache_static(request: Request, call_next):
+    resp = await call_next(request)
+    # Static assets (settings.js, common.css, …) are baked into the image and
+    # change on every rebuild. Force the browser to revalidate so it never runs
+    # a stale settings.js after an upgrade — the dropdown would otherwise keep
+    # the pre-upgrade command list. ETag (set by StaticFiles) keeps the
+    # revalidation a cheap 304 when nothing changed.
+    if request.url.path.startswith("/static/"):
+        resp.headers["Cache-Control"] = "no-cache"
+    return resp
+
+
+@app.middleware("http")
 async def auth_gate(request: Request, call_next):
     if not AUTH_ENABLED:
         return await call_next(request)
