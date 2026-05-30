@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>{{SESSION}} · agentbox</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.css">
+<link rel="stylesheet" href="/static/vendor/xterm/xterm.css">
 <link rel="stylesheet" href="/static/common.css">
 <script src="/static/settings.js"></script>
 <style>
@@ -63,11 +63,15 @@
   <span id="cog-mount"></span>
 </header>
 <div id="term"></div>
-<script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-webgl@0.19.0/lib/addon-webgl.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-web-links@0.12.0/lib/addon-web-links.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-unicode11@0.9.0/lib/addon-unicode11.js"></script>
+<!-- xterm.js + addons are vendored under /static/vendor/xterm (pinned: xterm 5.5.0,
+     addon-fit 0.10.0, addon-webgl 0.19.0, addon-web-links 0.12.0, addon-unicode11
+     0.9.0). Served locally — no third-party CDN, works offline, and nothing the
+     authenticated terminal loads can be swapped out from under it. -->
+<script src="/static/vendor/xterm/xterm.js"></script>
+<script src="/static/vendor/xterm/addon-fit.js"></script>
+<script src="/static/vendor/xterm/addon-webgl.js"></script>
+<script src="/static/vendor/xterm/addon-web-links.js"></script>
+<script src="/static/vendor/xterm/addon-unicode11.js"></script>
 <script>
 const SESSION = "{{SESSION}}";
 const status = document.getElementById("status");

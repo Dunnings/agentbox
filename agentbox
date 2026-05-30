@@ -22,9 +22,15 @@ cd "$(dirname "$0")"
 # .env is optional — agentbox runs fine without secrets if you don't need any
 # git host auth. docker compose still needs the file to exist when env_file
 # references it, so create an empty one if missing.
+#
+# .env holds tokens, so it must be 0600. We enforce that here rather than rely
+# on the file's committed mode: git only records 644/755, so a freshly cloned
+# .env.example is 644 and `cp .env.example .env` inherits that — world-readable.
+# Tightening on every run closes that gap no matter how .env was created.
 if [[ -f .env ]]; then
-  if [[ "$(stat -c '%a' .env 2>/dev/null || stat -f '%Lp' .env)" != "600" ]]; then
-    echo "warn: .env is not mode 600 — run: chmod 600 .env" >&2
+  mode="$(stat -c '%a' .env 2>/dev/null || stat -f '%Lp' .env)"
+  if [[ "$mode" != "600" ]]; then
+    chmod 600 .env && echo "note: tightened .env permissions to 600 (was ${mode})" >&2
   fi
 else
   : > .env

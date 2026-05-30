@@ -94,6 +94,19 @@ services:
       dind:
         condition: service_healthy
 
+    # --- Health ---------------------------------------------------------------
+    # Hits the control plane's unauthenticated /healthz with the venv Python
+    # (always present; avoids depending on curl being installed). `docker ps`
+    # then reports health, and `restart: unless-stopped` recycles the container
+    # if the control plane wedges. start_period covers first-boot image setup.
+    healthcheck:
+      test: ["CMD", "/opt/controlplane-venv/bin/python", "-c",
+              "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:9119/healthz', timeout=3).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
     # Long-lived container — exec in with ./agentbox
     restart: unless-stopped
     stdin_open: true

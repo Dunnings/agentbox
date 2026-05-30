@@ -70,7 +70,7 @@
   const params = new URLSearchParams(location.search);
   if (params.get("error")) document.getElementById("err").textContent = "Incorrect password.";
   const nxt = params.get("next");
-  if (nxt && nxt.startsWith("/") && !nxt.startsWith("//")) document.getElementById("next").value = nxt;
+  if (nxt && nxt.startsWith("/") && !nxt.startsWith("//") && !nxt.startsWith("/\\")) document.getElementById("next").value = nxt;
 </script>
 </body>
 </html>

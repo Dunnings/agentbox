@@ -59,7 +59,7 @@ ANIMALS = [
 
 def suggest_name() -> str:
     today = _dt.date.today().strftime("%d-%m-%y")
-    used = {s["name"].split("-", 1)[0] for s in tmux_sessions()}
+    used = {n.split("-", 1)[0] for n in session_names()}
     pool = [a for a in ANIMALS if a not in used] or ANIMALS
     return f"{random.choice(pool)}-{today}"
 
@@ -104,8 +104,12 @@ def _token_valid(token: str | None) -> bool:
 
 
 def _safe_next(dest: str) -> str:
-    """Only allow same-site redirect targets (no protocol-relative `//evil`)."""
-    return dest if dest.startswith("/") and not dest.startswith("//") else "/"
+    """Only allow same-site redirect targets. Rejects protocol-relative URLs:
+    `//evil`, and `/\\evil` (and its percent-encoded form) — browsers treat a
+    backslash after the leading slash as a second slash, making it offsite."""
+    if dest.startswith("/") and not dest.startswith(("//", "/\\", "/%5C", "/%5c")):
+        return dest
+    return "/"
 
 
 @app.middleware("http")
@@ -113,7 +117,7 @@ async def auth_gate(request: Request, call_next):
     if not AUTH_ENABLED:
         return await call_next(request)
     path = request.url.path
-    if path.startswith(_PUBLIC_PREFIXES) or path == "/favicon.ico":
+    if path.startswith(_PUBLIC_PREFIXES) or path in ("/favicon.ico", "/healthz"):
         return await call_next(request)
     if _token_valid(request.cookies.get(AUTH_COOKIE)):
         return await call_next(request)
@@ -163,27 +167,43 @@ SHELL_CMDS = {"bash", "zsh", "sh", "fish", "ash", "dash", "csh", "tcsh", "ksh", 
 CLAUDE_IDLE_HINTS = ("shift+tab", "? for shortcuts", "Bypass permissions")
 QUESTION_RE = re.compile(r"❯\s+1\.")
 
+# Every tmux call gets a timeout so a wedged tmux server can't hang a request
+# (read endpoints run in FastAPI's threadpool; without a bound, a stuck server
+# would slowly exhaust it under the 5s polling from the sessions page).
+TMUX_TIMEOUT = 5
 
-def pane_text(name: str) -> str:
+
+def _tmux_text(args: list[str]) -> str | None:
+    """Run a read-only tmux command; decoded stdout, or None on any failure."""
     try:
         out = subprocess.check_output(
-            ["tmux", "capture-pane", "-p", "-t", name],
-            stderr=subprocess.DEVNULL,
+            ["tmux", *args], stderr=subprocess.DEVNULL, timeout=TMUX_TIMEOUT,
         )
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return ""
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+        return None
     return out.decode("utf-8", errors="replace")
 
 
-def pane_current_command(name: str) -> str:
+def _tmux_run(args: list[str]) -> subprocess.CompletedProcess:
+    """Run a mutating tmux command, capturing output. Translates a hung or
+    missing tmux into an HTTP error instead of letting it block the worker."""
     try:
-        out = subprocess.check_output(
-            ["tmux", "display-message", "-p", "-t", name, "#{pane_current_command}"],
-            stderr=subprocess.DEVNULL,
+        return subprocess.run(
+            ["tmux", *args], capture_output=True, timeout=TMUX_TIMEOUT,
         )
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return ""
-    return out.decode().strip()
+    except subprocess.TimeoutExpired:
+        raise HTTPException(504, "tmux timed out")
+    except FileNotFoundError:
+        raise HTTPException(500, "tmux not available")
+
+
+def pane_text(name: str) -> str:
+    return _tmux_text(["capture-pane", "-p", "-t", name]) or ""
+
+
+def pane_current_command(name: str) -> str:
+    out = _tmux_text(["display-message", "-p", "-t", name, "#{pane_current_command}"])
+    return out.strip() if out else ""
 
 
 def session_status(name: str) -> str:
@@ -211,17 +231,21 @@ def session_status(name: str) -> str:
     return "running"
 
 
+def session_names() -> list[str]:
+    """Just the session names — no per-pane status probing. Used by name
+    suggestion, which only needs to know which animals are already taken."""
+    out = _tmux_text(["list-sessions", "-F", "#{session_name}"])
+    return out.splitlines() if out else []
+
+
 def tmux_sessions():
-    try:
-        out = subprocess.check_output(
-            [
-                "tmux", "list-sessions", "-F",
-                "#{session_name}\t#{session_attached}\t#{session_windows}\t#{session_created}",
-            ],
-            stderr=subprocess.DEVNULL,
-        ).decode().strip()
-    except (subprocess.CalledProcessError, FileNotFoundError):
+    out = _tmux_text([
+        "list-sessions", "-F",
+        "#{session_name}\t#{session_attached}\t#{session_windows}\t#{session_created}",
+    ])
+    if out is None:
         return []
+    out = out.strip()
     sessions = []
     for line in out.splitlines():
         if not line:
@@ -241,6 +265,13 @@ def tmux_sessions():
 @app.get("/", response_class=HTMLResponse)
 def index():
     return (STATIC / "index.html").read_text()
+
+
+@app.get("/healthz")
+def healthz():
+    """Liveness probe for the compose healthcheck. Public (no auth) and cheap —
+    it only confirms the FastAPI process is serving, not that tmux is healthy."""
+    return {"ok": True}
 
 
 @app.get("/api/sessions")
@@ -266,10 +297,7 @@ def create_session(
         raise HTTPException(400, "command is required")
     if not Path(cwd).is_dir():
         raise HTTPException(400, f"cwd does not exist: {cwd}")
-    res = subprocess.run(
-        ["tmux", "new-session", "-d", "-s", name, "-c", cwd, command],
-        capture_output=True,
-    )
+    res = _tmux_run(["new-session", "-d", "-s", name, "-c", cwd, command])
     if res.returncode != 0:
         msg = res.stderr.decode().strip() or "tmux failed"
         raise HTTPException(400, msg)
@@ -280,7 +308,7 @@ def create_session(
 def kill_session(name: str):
     if not NAME_RE.match(name):
         raise HTTPException(400, "invalid name")
-    res = subprocess.run(["tmux", "kill-session", "-t", name], capture_output=True)
+    res = _tmux_run(["kill-session", "-t", name])
     if res.returncode != 0:
         raise HTTPException(404, "no such session")
     return {"ok": True}
@@ -294,10 +322,7 @@ def rename_session(name: str, new_name: str = Form(...)):
         raise HTTPException(400, "invalid new name (alnum, dash, underscore; must start with alnum)")
     if new_name == name:
         return {"ok": True, "name": new_name}
-    res = subprocess.run(
-        ["tmux", "rename-session", "-t", name, new_name],
-        capture_output=True,
-    )
+    res = _tmux_run(["rename-session", "-t", name, new_name])
     if res.returncode != 0:
         msg = res.stderr.decode().strip() or "tmux failed"
         raise HTTPException(400, msg)
@@ -318,24 +343,20 @@ def capture_scrollback(name: str) -> bytes:
     holds no scrollback for the alt buffer, and the regular pane's history is
     stale bash output from before the alt-screen app launched.
 
-    `-E -1` stops one line above the visible screen so the live `tmux attach`
-    that follows can repaint the visible region without overlap.
+    `-S -5000` caps the replay at the last 5000 lines — the same scrollback
+    depth the client's xterm.js keeps — so we never ship history the browser
+    would immediately drop. `-E -1` stops one line above the visible screen so
+    the live `tmux attach` that follows can repaint it without overlap.
     """
-    try:
-        alt = subprocess.check_output(
-            ["tmux", "display-message", "-p", "-t", name, "#{alternate_on}"],
-            stderr=subprocess.DEVNULL,
-        ).decode().strip()
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return b""
-    if alt != "0":
+    alt = _tmux_text(["display-message", "-p", "-t", name, "#{alternate_on}"])
+    if alt is None or alt.strip() != "0":
         return b""
     try:
         out = subprocess.check_output(
-            ["tmux", "capture-pane", "-p", "-e", "-S", "-", "-E", "-1", "-t", name],
-            stderr=subprocess.DEVNULL,
+            ["tmux", "capture-pane", "-p", "-e", "-S", "-5000", "-E", "-1", "-t", name],
+            stderr=subprocess.DEVNULL, timeout=TMUX_TIMEOUT,
         )
-    except subprocess.CalledProcessError:
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
         return b""
     # capture-pane separates lines with \n; xterm.js needs \r\n in raw mode.
     return out.replace(b"\n", b"\r\n")
@@ -439,14 +460,28 @@ async def ws_terminal(websocket: WebSocket, name: str):
             os.close(fd)
         except OSError:
             pass
+        # Tear down the per-connection tmux client and reap it so it doesn't
+        # linger as a zombie (the server process is long-lived and never wait()s
+        # again). It exits promptly on SIGHUP; poll briefly, then SIGKILL as a
+        # backstop so a wedged client can't accumulate across reconnects.
         try:
             os.kill(pid, signal.SIGHUP)
         except ProcessLookupError:
-            pass
-        try:
-            os.waitpid(pid, os.WNOHANG)
-        except ChildProcessError:
-            pass
+            pid = None
+        if pid is not None:
+            for _ in range(50):  # up to ~0.5s
+                try:
+                    if os.waitpid(pid, os.WNOHANG)[0] != 0:
+                        break
+                except ChildProcessError:
+                    break
+                await asyncio.sleep(0.01)
+            else:
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                    os.waitpid(pid, 0)
+                except (ProcessLookupError, ChildProcessError):
+                    pass
 
 
 if __name__ == "__main__":
