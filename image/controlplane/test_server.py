@@ -47,7 +47,11 @@ def test_token_roundtrip_valid():
 def test_token_rejects_tampered_and_garbage():
     tok = server._make_token()
     exp, _, sig = tok.partition(".")
-    assert not server._token_valid(f"{exp}.{sig[:-1]}0")  # flipped signature
+    # Flip the last signature char to a guaranteed-different hex digit. (A bare
+    # "...0" was flaky: when the signature already ended in 0 it was a no-op and
+    # the untampered token validated.)
+    flipped = sig[:-1] + ("1" if sig[-1] == "0" else "0")
+    assert not server._token_valid(f"{exp}.{flipped}")  # flipped signature
     assert not server._token_valid(f"{exp}.")
     assert not server._token_valid("garbage")
     assert not server._token_valid(None)
