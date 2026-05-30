@@ -33,12 +33,32 @@ jobs:
       - run: shellcheck agentbox image/entrypoint.sh
 
   hadolint:
-    name: hadolint (advisory)
+    name: hadolint
     runs-on: ubuntu-latest
-    continue-on-error: true  # Dockerfile best-practice hints, not a gate.
     steps:
       - uses: actions/checkout@v4
-      - run: docker run --rm -i hadolint/hadolint < image/Dockerfile
+      # Lint the Dockerfile for genuine problems. The --ignore list below is
+      # deliberate design choices and false positives, not oversights:
+      #   DL3008/DL3013/DL3016  unpinned apt/pip/npm versions — this is a dev
+      #                         sandbox image that tracks "latest" on purpose;
+      #                         pinning every package would rot and break rebuilds.
+      #   DL4006                pipefail before a piped RUN — the `curl | bash`
+      #                         vendor bootstrappers are guarded by `if` blocks;
+      #                         forcing a global bash SHELL is more invasive than
+      #                         the hint is worth.
+      #   DL3046                useradd -l for a "high" UID — the UID is build-arg
+      #                         driven (default 1000) and not actually high;
+      #                         hadolint just can't evaluate ${USER_UID} statically.
+      #   SC2102                `uvicorn[standard]` is pip extras syntax, not a
+      #                         shell character range.
+      #   SC2016                the single-quoted printf into .bashrc writes
+      #                         literal $HOME / \w on purpose.
+      - run: |
+          docker run --rm -i hadolint/hadolint hadolint \
+            --ignore DL3008 --ignore DL3013 --ignore DL3016 \
+            --ignore DL4006 --ignore DL3046 \
+            --ignore SC2102 --ignore SC2016 \
+            - < image/Dockerfile
 
   build:
     name: docker build (smoke)
