@@ -126,6 +126,35 @@ async def no_cache_static(request: Request, call_next):
     return resp
 
 
+# Content-Security-Policy for the control plane. Everything is same-origin and
+# vendored (xterm, fonts) — no third-party CDN — so 'self' covers scripts,
+# styles, fonts, images, and the terminal WebSocket. The pages carry a few
+# inline <script>/<style> blocks, hence 'unsafe-inline'. frame-ancestors 'none'
+# blocks clickjacking of a UI that can spawn/kill sessions and run commands.
+_CSP = (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline'; "
+    "style-src 'self' 'unsafe-inline'; "
+    "img-src 'self' data:; "
+    "font-src 'self'; "
+    "connect-src 'self'; "
+    "base-uri 'none'; "
+    "form-action 'self'; "
+    "frame-ancestors 'none'; "
+    "object-src 'none'"
+)
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    resp = await call_next(request)
+    resp.headers.setdefault("Content-Security-Policy", _CSP)
+    resp.headers.setdefault("X-Frame-Options", "DENY")
+    resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+    resp.headers.setdefault("Referrer-Policy", "no-referrer")
+    return resp
+
+
 @app.middleware("http")
 async def auth_gate(request: Request, call_next):
     if not AUTH_ENABLED:
@@ -148,8 +177,35 @@ def login_page():
     return (STATIC / "login.html").read_text()
 
 
+# --- Login brute-force throttle ---------------------------------------------
+# The login is a single shared password, so slow online guessing down. We keep
+# recent failure timestamps per client IP and, before evaluating an attempt,
+# sleep for a delay that grows with the count (capped). A legitimate user who
+# mistypes once waits a fraction of a second; an attacker is throttled to a
+# trickle. We deliberately add delay rather than hard-lock, so nobody can lock
+# the real user out by spamming bad passwords. In-memory only — a control-plane
+# restart clears it, which is fine for this purpose.
+_LOGIN_FAILURES: dict[str, list[float]] = {}
+_LOGIN_WINDOW = 15 * 60  # seconds a failure counts toward the delay
+_LOGIN_MAX_DELAY = 5.0   # cap so a wedged client can't stall a worker for long
+
+
+def _client_ip(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
+
+
+def _recent_failures(ip: str) -> int:
+    cutoff = time.monotonic() - _LOGIN_WINDOW
+    fails = [t for t in _LOGIN_FAILURES.get(ip, []) if t > cutoff]
+    if fails:
+        _LOGIN_FAILURES[ip] = fails
+    else:
+        _LOGIN_FAILURES.pop(ip, None)
+    return len(fails)
+
+
 @app.post("/login")
-def login_submit(
+async def login_submit(
     request: Request,
     password: str = Form(...),
     dest: str = Form("/", alias="next"),
@@ -157,8 +213,15 @@ def login_submit(
     if not AUTH_ENABLED:
         return RedirectResponse("/", status_code=303)
     dest = _safe_next(dest)
+    ip = _client_ip(request)
+    # Throttle before evaluating, so repeated guesses each pay the growing delay.
+    prior = _recent_failures(ip)
+    if prior:
+        await asyncio.sleep(min(_LOGIN_MAX_DELAY, 0.25 * 2 ** min(prior, 5)))
     if not hmac.compare_digest(password.encode(), AUTH_PASSWORD.encode()):
+        _LOGIN_FAILURES.setdefault(ip, []).append(time.monotonic())
         return RedirectResponse(f"/login?error=1&next={quote(dest)}", status_code=303)
+    _LOGIN_FAILURES.pop(ip, None)  # clear the penalty on success
     resp = RedirectResponse(dest, status_code=303)
     # Secure when the client is on HTTPS (trust the tunnel's forwarded proto);
     # plain http on localhost stays non-Secure so local login still works.
@@ -472,6 +535,44 @@ async def ws_terminal(websocket: WebSocket, name: str):
 
     loop.add_reader(fd, on_readable)
 
+    # Client→pty writes. The fd is non-blocking, so a single os.write can write
+    # fewer bytes than asked (or raise EAGAIN) when the pty buffer fills — which
+    # is exactly what a large paste does. A bare os.write would silently drop the
+    # tail or kill the task. Buffer the unwritten remainder and flush it from an
+    # add_writer callback as the pty drains, preserving every byte and its order.
+    write_buf = bytearray()
+    writer_registered = False
+    WRITE_BUF_CAP = 4 * 1024 * 1024  # backstop against an unbounded buffer
+
+    def flush_writes():
+        nonlocal writer_registered
+        while write_buf:
+            try:
+                n = os.write(fd, write_buf)
+            except (BlockingIOError, InterruptedError):
+                break  # pty full / interrupted — retry on the next writable event
+            except OSError:
+                write_buf.clear()
+                queue.put_nowait(None)  # pty gone; unblock the read side too
+                break
+            if n <= 0:
+                break
+            del write_buf[:n]
+        if write_buf and not writer_registered:
+            loop.add_writer(fd, flush_writes)
+            writer_registered = True
+        elif not write_buf and writer_registered:
+            loop.remove_writer(fd)
+            writer_registered = False
+
+    def feed_write(data: bytes):
+        # Drop input rather than grow without bound if the pty stalls hard — far
+        # past any real paste, so in practice this never trips.
+        if len(write_buf) + len(data) > WRITE_BUF_CAP:
+            return
+        write_buf.extend(data)
+        flush_writes()
+
     async def pump_to_client():
         while True:
             data = await queue.get()
@@ -485,7 +586,7 @@ async def ws_terminal(websocket: WebSocket, name: str):
             if msg["type"] == "websocket.disconnect":
                 return
             if msg.get("bytes"):
-                os.write(fd, msg["bytes"])
+                feed_write(msg["bytes"])
             elif msg.get("text"):
                 try:
                     obj = json.loads(msg["text"])
@@ -504,9 +605,14 @@ async def ws_terminal(websocket: WebSocket, name: str):
 
     tasks = [asyncio.create_task(pump_to_client()), asyncio.create_task(pump_to_pty())]
     try:
-        _, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+        done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
         for t in pending:
             t.cancel()
+        # Retrieve any exception from the finished task so asyncio doesn't log a
+        # spurious "Task exception was never retrieved" when a pump raises (e.g.
+        # the socket dies mid-write). The connection is tearing down regardless.
+        for t in done:
+            t.exception()
     except WebSocketDisconnect:
         pass
     finally:
@@ -514,6 +620,11 @@ async def ws_terminal(websocket: WebSocket, name: str):
             loop.remove_reader(fd)
         except Exception:
             pass
+        if writer_registered:
+            try:
+                loop.remove_writer(fd)
+            except Exception:
+                pass
         try:
             os.close(fd)
         except OSError:

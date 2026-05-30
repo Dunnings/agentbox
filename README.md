@@ -312,7 +312,13 @@ Container hardening:
 - Resource caps: pids, memory, CPU, file descriptors.
 - Control plane port published on `127.0.0.1` only; remote access is gated by
   the built-in password login (`AGENTBOX_PASSWORD`), Cloudflare Access, or whatever
-  auth proxy you put in front.
+  auth proxy you put in front. The password login throttles repeated failures
+  (growing per-IP delay) to slow online guessing.
+- Control-plane responses carry hardening headers — a same-origin
+  `Content-Security-Policy`, `X-Frame-Options: DENY` (no framing/clickjacking of
+  a UI that runs commands), `X-Content-Type-Options: nosniff`, and a
+  `no-referrer` policy. Session names are rendered as text, never interpolated
+  into HTML, so a name set outside the API can't inject script.
 
 The dind sidecar **is** privileged — that's how dockerd-in-docker works —
 but it sits behind an internal compose network with no published port,
@@ -332,6 +338,7 @@ the sidecar with secrets you wouldn't trust agentbox with.
 | `agentbox` | Build (with daily cache-bust), bring container up; `--attach` to drop into tmux |
 | `image/CLAUDE.md` | In-container `CLAUDE.md` — describes the sandbox to Claude Code if you use it |
 | `image/controlplane/server.py` | FastAPI app: tmux list/spawn/kill + WebSocket-PTY terminal |
+| `image/controlplane/test_server.py` | Unit tests for auth tokens, redirect safety, name validation, security headers, login throttle |
 | `image/controlplane/static/index.html` | Sessions list + spawn form |
 | `image/controlplane/static/terminal.html` | xterm.js terminal page |
 | `image/controlplane/static/settings.js` | Theme / zoom / configurable command list (stored in localStorage) |

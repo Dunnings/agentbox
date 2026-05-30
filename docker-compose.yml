@@ -155,7 +155,8 @@ services:
   # hostname, the http://agentbox:9119 service, and Cloudflare Access — is
   # configured in the Zero Trust dashboard where you created the tunnel.
   cloudflared:
-    image: cloudflare/cloudflared:latest
+    # Pinned for reproducibility / supply-chain hygiene — bump deliberately.
+    image: cloudflare/cloudflared:2026.5.2
     container_name: agentbox-cloudflared
     profiles: ["tunnel"]
     restart: unless-stopped
