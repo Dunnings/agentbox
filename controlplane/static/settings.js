@@ -14,18 +14,33 @@
   });
   // Shown only until /api/commands responds, or if it can't be reached.
   const FALLBACK_COMMANDS = Object.freeze(["bash -l"]);
+  // The hardcoded default the pre-detection build saved into localStorage on
+  // any settings change. Migrated to "follow detected" on load (see below) so
+  // upgraders aren't pinned to the old claude+bash pair and actually pick up
+  // newly-installed tools (copilot, node, …).
+  const LEGACY_DEFAULT_COMMANDS = [
+    "claude --dangerously-skip-permissions",
+    "bash -l",
+  ];
+
+  function sameList(a, b) {
+    return a.length === b.length && a.every((v, i) => v === b[i]);
+  }
 
   function load() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return { ...DEFAULTS };
       const parsed = JSON.parse(raw);
+      let commands = Array.isArray(parsed.commands)
+        ? parsed.commands.filter((c) => typeof c === "string")
+        : null;
+      // Treat the legacy default as "not customized" so it follows detection.
+      if (commands && sameList(commands, LEGACY_DEFAULT_COMMANDS)) commands = null;
       return {
         theme: parsed.theme === "light" ? "light" : "dark",
         zoom: clampZoom(parsed.zoom ?? DEFAULTS.zoom),
-        commands: Array.isArray(parsed.commands)
-          ? parsed.commands.filter((c) => typeof c === "string")
-          : null,
+        commands,
       };
     } catch {
       return { ...DEFAULTS };
