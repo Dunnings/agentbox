@@ -268,7 +268,7 @@ COPY controlplane /opt/controlplane
 
 # --- Entrypoint --------------------------------------------------------------
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-COPY container-CLAUDE.md /etc/agentbox/CLAUDE.md
+COPY CLAUDE.md /etc/agentbox/CLAUDE.md
 RUN chmod 0755 /usr/local/bin/entrypoint.sh \
     && chmod 0644 /etc/agentbox/CLAUDE.md
 

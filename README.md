@@ -326,15 +326,15 @@ the sidecar with secrets you wouldn't trust agentbox with.
 
 | Path | Purpose |
 |------|---------|
-| `Dockerfile` | Debian 12 base + Python venv for the control plane; toolchains, utilities, and CLI AI agents (Claude Code, Copilot, Codex, Gemini, Aider) toggled via `INSTALL_*` build args — see [Choosing toolchains](#choosing-toolchains) |
+| `image/Dockerfile` | Debian 12 base + Python venv for the control plane; toolchains, utilities, and CLI AI agents (Claude Code, Copilot, Codex, Gemini, Aider) toggled via `INSTALL_*` build args — see [Choosing toolchains](#choosing-toolchains) |
 | `docker-compose.yml` | Hardening, volumes, resource limits, loopback port publish, dind sidecar, optional cloudflared tunnel sidecar |
-| `entrypoint.sh` | Wires up optional GitHub/GitLab credentials from `.env`, backgrounds the control plane with auto-restart |
+| `image/entrypoint.sh` | Wires up optional GitHub/GitLab credentials from `.env`, backgrounds the control plane with auto-restart |
 | `agentbox` | Build (with daily cache-bust), bring container up; `--attach` to drop into tmux |
-| `container-CLAUDE.md` | In-container `CLAUDE.md` — describes the sandbox to Claude Code if you use it |
-| `controlplane/server.py` | FastAPI app: tmux list/spawn/kill + WebSocket-PTY terminal |
-| `controlplane/static/index.html` | Sessions list + spawn form |
-| `controlplane/static/terminal.html` | xterm.js terminal page |
-| `controlplane/static/settings.js` | Theme / zoom / configurable command list (stored in localStorage) |
+| `image/CLAUDE.md` | In-container `CLAUDE.md` — describes the sandbox to Claude Code if you use it |
+| `image/controlplane/server.py` | FastAPI app: tmux list/spawn/kill + WebSocket-PTY terminal |
+| `image/controlplane/static/index.html` | Sessions list + spawn form |
+| `image/controlplane/static/terminal.html` | xterm.js terminal page |
+| `image/controlplane/static/settings.js` | Theme / zoom / configurable command list (stored in localStorage) |
 | `.env.example` | Template — copy to `.env` and fill in (everything optional) |
 
 ## License

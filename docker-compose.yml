@@ -1,7 +1,7 @@
 services:
   agentbox:
     build:
-      context: .
+      context: ./image
       dockerfile: Dockerfile
       args:
         # `agentbox` sets CLAUDE_VERSION to today's date so the claude-code layer
