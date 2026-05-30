@@ -1,0 +1,175 @@
+services:
+  agentbox:
+    build:
+      context: ./image
+      dockerfile: Dockerfile
+      args:
+        # `agentbox` sets CLAUDE_VERSION to today's date so the claude-code layer
+        # rebuilds (and pulls latest) at most once per day. Unset → "latest"
+        # but cached forever, which is the stale-version trap we're avoiding.
+        CLAUDE_VERSION: ${CLAUDE_VERSION:-latest}
+        # Optional toolchains — set these in .env (see .env.example); this block
+        # just reads .env and forwards each as a build arg to the Dockerfile,
+        # which declares matching ARGs. The `:-` value here is the fallback when
+        # a flag is absent from .env: standard tools on, extras/AI agents off.
+        INSTALL_NODE: ${INSTALL_NODE:-1}
+        INSTALL_BUN: ${INSTALL_BUN:-1}
+        INSTALL_RUST: ${INSTALL_RUST:-1}
+        INSTALL_DOCKER: ${INSTALL_DOCKER:-1}
+        INSTALL_GH: ${INSTALL_GH:-1}
+        INSTALL_GLAB: ${INSTALL_GLAB:-1}
+        INSTALL_CLAUDE: ${INSTALL_CLAUDE:-1}
+        # Extra languages & utilities (opt-in)
+        INSTALL_PYTHON: ${INSTALL_PYTHON:-0}
+        INSTALL_GO: ${INSTALL_GO:-0}
+        INSTALL_DENO: ${INSTALL_DENO:-0}
+        INSTALL_RUBY: ${INSTALL_RUBY:-0}
+        INSTALL_SEARCH: ${INSTALL_SEARCH:-0}
+        INSTALL_YQ: ${INSTALL_YQ:-0}
+        INSTALL_SHELLCHECK: ${INSTALL_SHELLCHECK:-0}
+        INSTALL_DB_CLIENTS: ${INSTALL_DB_CLIENTS:-0}
+        # CLI AI coding agents (opt-in)
+        INSTALL_COPILOT: ${INSTALL_COPILOT:-0}
+        INSTALL_CODEX: ${INSTALL_CODEX:-0}
+        INSTALL_GEMINI: ${INSTALL_GEMINI:-0}
+        INSTALL_AIDER: ${INSTALL_AIDER:-0}
+    image: agentbox:latest
+    container_name: agentbox
+    hostname: agentbox
+
+    # --- Security hardening ---------------------------------------------------
+    # Non-root user is baked into the image. Drop every capability; seccomp +
+    # apparmor stay at docker defaults, which block the obvious escape surface.
+    user: "1000:1000"
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
+    # The host Docker socket is NOT mounted and must never be. Docker access
+    # goes through the `dind` sidecar over the internal compose network — that
+    # daemon is privileged but isolated from the host, so anything launched
+    # from agentbox lives inside dind, not on your machine.
+    privileged: false
+
+    # --- Resource limits ------------------------------------------------------
+    pids_limit: 2048
+    mem_limit: 12g
+    memswap_limit: 12g
+    cpus: 4.0
+    ulimits:
+      nofile: 8192
+      nproc: 4096
+
+    # --- Secrets and config ---------------------------------------------------
+    env_file:
+      - .env
+    environment:
+      # Keep the npm cache on the persistent home volume.
+      NPM_CONFIG_CACHE: /home/dev/.npm
+      # Talk to the sidecar Docker daemon, not the host. The `dind` service
+      # listens on plaintext TCP 2375 inside the private compose network.
+      DOCKER_HOST: tcp://dind:2375
+
+    # --- Storage --------------------------------------------------------------
+    # `work` holds cloned repos. `home` holds caches, agent state, shell
+    # history — persists across `down`/`up`, wipe with `docker volume rm`.
+    volumes:
+      - work:/work
+      - home:/home/dev
+      # Optional seed dirs copied into /home/dev and /work on startup (see
+      # SEED_HOME / SEED_WORK in .env). Read-only. Unset → /dev/null, which the
+      # entrypoint detects as "no seed" and skips.
+      - ${SEED_HOME:-/dev/null}:/etc/agentbox/seed-home:ro
+      - ${SEED_WORK:-/dev/null}:/etc/agentbox/seed-work:ro
+    tmpfs:
+      - /tmp:size=2g,mode=1777
+
+    # --- Network --------------------------------------------------------------
+    # Loopback-only publish: a reverse proxy on the host (e.g. cloudflared)
+    # reaches the control plane via 127.0.0.1:9119; nothing on the LAN can hit
+    # it directly.
+    ports:
+      - "127.0.0.1:9119:9119"
+
+    depends_on:
+      dind:
+        condition: service_healthy
+
+    # --- Health ---------------------------------------------------------------
+    # Hits the control plane's unauthenticated /healthz with the venv Python
+    # (always present; avoids depending on curl being installed). `docker ps`
+    # then reports health, and `restart: unless-stopped` recycles the container
+    # if the control plane wedges. start_period covers first-boot image setup.
+    healthcheck:
+      test: ["CMD", "/opt/controlplane-venv/bin/python", "-c",
+              "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:9119/healthz', timeout=3).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+    # Long-lived container — exec in with ./agentbox
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+
+  # --- Sidecar Docker daemon --------------------------------------------------
+  # Runs dockerd in its own privileged container so agentbox can stay
+  # unprivileged and capability-dropped. Containers, images, and volumes
+  # created from agentbox live inside this sidecar — they do NOT appear on the
+  # host's Docker daemon and cannot mount the host filesystem.
+  #
+  # The daemon listens on plaintext TCP 2375; that port is NOT published, so
+  # only services on the internal compose network (i.e. agentbox) can reach
+  # it. TLS is disabled deliberately — no value over a private bridge network,
+  # and avoids cert plumbing into agentbox.
+  dind:
+    image: docker:27-dind
+    container_name: agentbox-dind
+    hostname: dind
+    privileged: true
+    restart: unless-stopped
+    environment:
+      DOCKER_TLS_CERTDIR: ""
+    command:
+      - dockerd
+      - --host=tcp://0.0.0.0:2375
+      - --host=unix:///var/run/docker.sock
+    volumes:
+      # Persistent image / container / volume storage for the inner daemon.
+      # Wipe with `docker volume rm agentbox-dind-data` to start fresh.
+      - dind-data:/var/lib/docker
+    # No `ports:` — TCP 2375 is reachable only from inside the compose network.
+    healthcheck:
+      test: ["CMD", "docker", "info"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  # --- Cloudflare Tunnel sidecar (optional) -----------------------------------
+  # Exposes the control plane to the internet through a Cloudflare "remotely-
+  # managed" tunnel — no inbound ports opened on your network, no cloudflared
+  # install on the host. Set CLOUDFLARE_TUNNEL_TOKEN in .env and it starts
+  # automatically (./agentbox enables the `tunnel` profile when the token is set;
+  # or run `docker compose --profile tunnel up -d`). All routing — public
+  # hostname, the http://agentbox:9119 service, and Cloudflare Access — is
+  # configured in the Zero Trust dashboard where you created the tunnel.
+  cloudflared:
+    # Pinned for reproducibility / supply-chain hygiene — bump deliberately.
+    image: cloudflare/cloudflared:2026.5.2
+    container_name: agentbox-cloudflared
+    profiles: ["tunnel"]
+    restart: unless-stopped
+    command: ["tunnel", "--no-autoupdate", "run"]
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on:
+      - agentbox
+
+volumes:
+  work:
+    name: agentbox-work
+  home:
+    name: agentbox-home
+  dind-data:
+    name: agentbox-dind-data

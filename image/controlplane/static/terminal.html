@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{{SESSION}} · agentbox</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/static/vendor/xterm/xterm.css">
+<link rel="stylesheet" href="/static/common.css">
+<script src="/static/settings.js"></script>
+<style>
+  /* Base reset, body font/colors, and --sans/--mono tokens live in common.css. */
+  html, body { height: 100%; }
+  body { display: flex; flex-direction: column; overflow: hidden; overscroll-behavior: none; }
+  header {
+    padding: 0.5rem 0.75rem 0.5rem 1rem;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-shrink: 0;
+  }
+  header a { color: var(--accent); text-decoration: none; font-size: 0.85rem; }
+  header a:hover { text-decoration: underline; }
+  header .name {
+    font-family: var(--mono);
+    font-weight: 600;
+    padding: 0.15rem 0.4rem;
+    margin: -0.15rem -0.4rem;
+    border-radius: 4px;
+    cursor: text;
+    border: 1px solid transparent;
+  }
+  header .name:hover { background: var(--panel-h); border-color: var(--border); }
+  header .name-edit {
+    font: inherit;
+    font-family: var(--mono);
+    font-weight: 600;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    padding: 0.15rem 0.4rem;
+    margin: -0.15rem -0.4rem;
+    outline: none;
+  }
+  header .name-edit.invalid { border-color: var(--danger); }
+  header .status { margin-left: auto; font-size: 0.75rem; color: var(--live); }
+  header .status.dis { color: var(--danger); }
+  header .status.connecting { color: #c0c080; }
+  #term { flex: 1; padding: 0.25rem 0.5rem; min-height: 0; background: var(--bg); touch-action: none; }
+  .xterm { height: 100%; }
+</style>
+</head>
+<body>
+<header>
+  <a href="/">← back</a>
+  <span class="name" id="name" title="click to rename">{{SESSION}}</span>
+  <span class="status connecting" id="status">connecting…</span>
+  <button class="icon-btn danger" id="kill" title="kill session" aria-label="kill session">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6"/></svg>
+  </button>
+  <span id="cog-mount"></span>
+</header>
+<div id="term"></div>
+<!-- xterm.js + addons are vendored under /static/vendor/xterm (pinned: xterm 5.5.0,
+     addon-fit 0.10.0, addon-webgl 0.19.0, addon-web-links 0.12.0, addon-unicode11
+     0.9.0). Served locally — no third-party CDN, works offline, and nothing the
+     authenticated terminal loads can be swapped out from under it. -->
+<script src="/static/vendor/xterm/xterm.js"></script>
+<script src="/static/vendor/xterm/addon-fit.js"></script>
+<script src="/static/vendor/xterm/addon-webgl.js"></script>
+<script src="/static/vendor/xterm/addon-web-links.js"></script>
+<script src="/static/vendor/xterm/addon-unicode11.js"></script>
+<script>
+const SESSION = "{{SESSION}}";
+const status = document.getElementById("status");
+
+document.getElementById("cog-mount").appendChild(Settings.createCog());
+
+document.getElementById("kill").addEventListener("click", async () => {
+  if (!confirm(`kill session "${SESSION}"?`)) return;
+  unloading = true;
+  try {
+    await fetch(`/api/sessions/${encodeURIComponent(SESSION)}`, { method: "DELETE" });
+  } catch {}
+  location.href = "/";
+});
+
+function setStatus(text, cls) {
+  status.textContent = text;
+  status.className = "status" + (cls ? " " + cls : "");
+}
+
+const NAME_RE = /^[A-Za-z0-9][A-Za-z0-9_\-]{0,63}$/;
+const nameEl = document.getElementById("name");
+nameEl.addEventListener("click", startRename);
+
+function startRename() {
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "name-edit";
+  input.value = SESSION;
+  input.spellcheck = false;
+  input.autocapitalize = "off";
+  input.size = Math.max(SESSION.length, 8);
+  nameEl.replaceWith(input);
+  input.focus();
+  input.select();
+
+  let done = false;
+  const cancel = () => {
+    if (done) return;
+    done = true;
+    input.replaceWith(nameEl);
+  };
+  const commit = async () => {
+    if (done) return;
+    const next = input.value.trim();
+    if (next === SESSION) return cancel();
+    if (!NAME_RE.test(next)) {
+      input.classList.add("invalid");
+      input.focus();
+      return;
+    }
+    done = true;
+    input.disabled = true;
+    const fd = new FormData();
+    fd.append("new_name", next);
+    let r;
+    try {
+      r = await fetch(`/api/sessions/${encodeURIComponent(SESSION)}`, { method: "PATCH", body: fd });
+    } catch {
+      done = false;
+      input.disabled = false;
+      input.classList.add("invalid");
+      input.focus();
+      return;
+    }
+    if (!r.ok) {
+      done = false;
+      input.disabled = false;
+      input.classList.add("invalid");
+      input.focus();
+      return;
+    }
+    location.replace(`/t/${encodeURIComponent(next)}`);
+  };
+
+  input.addEventListener("input", () => input.classList.remove("invalid"));
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); commit(); }
+    else if (e.key === "Escape") { e.preventDefault(); cancel(); }
+  });
+  input.addEventListener("blur", commit);
+}
+
+const initial = Settings.get();
+const term = new Terminal({
+  cursorBlink: true,
+  fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", "Liberation Mono", "Roboto Mono", "Noto Sans Mono", monospace',
+  fontSize: initial.zoom,
+  theme: Settings.terminalTheme(),
+  scrollback: 5000,
+  allowProposedApi: true,
+});
+const fit = new FitAddon.FitAddon();
+term.loadAddon(fit);
+const termEl = document.getElementById("term");
+termEl.addEventListener("contextmenu", (e) => e.preventDefault());
+term.open(termEl);
+
+// Touch scrolling. xterm.js puts .xterm-viewport and .xterm-screen as siblings,
+// so finger drags on the screen layer don't natively scroll the viewport — on
+// iOS they hit the document instead and trigger pull-to-refresh. We translate
+// drags into synthetic wheel events so xterm.js's own wheel handling runs:
+// in normal-buffer that scrolls scrollback, in alt-buffer (tmux, Claude TUI)
+// it forwards a mouse-wheel CSI sequence to the app — matching desktop.
+let touchY = null;
+let touchRemainder = 0;
+termEl.addEventListener("touchstart", (e) => {
+  if (e.touches.length !== 1) { touchY = null; return; }
+  touchY = e.touches[0].clientY;
+  touchRemainder = 0;
+}, { passive: true });
+termEl.addEventListener("touchmove", (e) => {
+  if (e.touches.length !== 1 || touchY === null) return;
+  const t = e.touches[0];
+  const dy = t.clientY - touchY;
+  touchY = t.clientY;
+  const cellH = termEl.clientHeight / term.rows;
+  if (cellH <= 0) return;
+  touchRemainder += dy;
+  const lines = Math.trunc(touchRemainder / cellH);
+  if (!lines) return;
+  touchRemainder -= lines * cellH;
+  const target = termEl.querySelector(".xterm-screen") || termEl;
+  target.dispatchEvent(new WheelEvent("wheel", {
+    deltaY: -lines,
+    deltaMode: 1, // DOM_DELTA_LINE
+    bubbles: true,
+    cancelable: true,
+    clientX: t.clientX,
+    clientY: t.clientY,
+  }));
+}, { passive: true });
+const endTouch = () => { touchY = null; };
+termEl.addEventListener("touchend", endTouch);
+termEl.addEventListener("touchcancel", endTouch);
+
+const webgl = new WebglAddon.WebglAddon();
+webgl.onContextLoss(() => webgl.dispose());
+term.loadAddon(webgl);
+
+term.loadAddon(new WebLinksAddon.WebLinksAddon());
+
+term.loadAddon(new Unicode11Addon.Unicode11Addon());
+term.unicode.activeVersion = "11";
+
+// OSC 52 → host clipboard. Accept any selector since tmux rewrites "c" to empty
+// when forwarding with `set-clipboard on`. This also makes tmux mouse-drag copy
+// to the host clipboard automatically.
+term.parser.registerOscHandler(52, (data) => {
+  const idx = data.indexOf(";");
+  if (idx < 0) return false;
+  const b64 = data.slice(idx + 1);
+  if (b64 === "?" || !b64) return false;
+  let text;
+  try {
+    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    text = new TextDecoder().decode(bytes);
+  } catch { return false; }
+  navigator.clipboard?.writeText(text).catch(() => {});
+  return true;
+});
+
+fit.fit();
+
+Settings.onChange((s) => {
+  term.options.theme = Settings.terminalTheme();
+  if (term.options.fontSize !== s.zoom) {
+    term.options.fontSize = s.zoom;
+    fit.fit();
+    sendResize();
+  }
+});
+
+// WebSocket lifecycle with auto-reconnect. The server kills the per-WS pty on
+// close but the underlying tmux session persists, so a fresh attach repaints
+// the screen — the reconnect is invisible to the user.
+let ws = null;
+let reconnectTimer = null;
+let reconnectAttempt = 0;
+let pingTimer = null;
+let unloading = false;
+let firstConnect = true;
+
+window.addEventListener("beforeunload", () => { unloading = true; });
+
+function connect() {
+  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+  setStatus(reconnectAttempt > 0 ? "reconnecting…" : "connecting…", "connecting");
+
+  const proto = location.protocol === "https:" ? "wss:" : "ws:";
+  // ?history=1 on first connect asks the server to replay tmux pane history
+  // into xterm.js scrollback. Skipped on reconnect — the existing scrollback
+  // in this xterm.js instance is preserved across WebSocket lifecycles.
+  const qs = firstConnect ? "?history=1" : "";
+  firstConnect = false;
+  ws = new WebSocket(`${proto}//${location.host}/ws/${encodeURIComponent(SESSION)}${qs}`);
+  ws.binaryType = "arraybuffer";
+
+  ws.addEventListener("open", () => {
+    reconnectAttempt = 0;
+    setStatus("connected", "");
+    sendResize();
+    term.focus();
+    // Keepalive — prevents idle reverse proxies (Cloudflare default: 100s)
+    // from killing the connection. Server ignores unknown JSON types.
+    clearInterval(pingTimer);
+    pingTimer = setInterval(() => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "ping" }));
+      }
+    }, 30000);
+  });
+  ws.addEventListener("message", (e) => {
+    if (typeof e.data === "string") {
+      term.write(e.data);
+    } else {
+      term.write(new Uint8Array(e.data));
+    }
+  });
+  ws.addEventListener("close", (e) => {
+    clearInterval(pingTimer);
+    if (unloading) return;
+    if (e.code === 4401) {  // auth required / session expired
+      unloading = true;
+      location.href = "/login?next=" + encodeURIComponent(location.pathname);
+      return;
+    }
+    setStatus("reconnecting…", "connecting");
+    scheduleReconnect();
+  });
+  // `error` always fires `close` after; let close handle the reconnect.
+  ws.addEventListener("error", () => {});
+}
+
+function scheduleReconnect() {
+  if (unloading || reconnectTimer) return;
+  // Backoff caps at 5s. Hidden tabs throttle setTimeout to ~1Hz, so we also
+  // rely on visibilitychange to wake up immediately when the tab is foregrounded.
+  const delay = Math.min(5000, 250 * Math.pow(2, reconnectAttempt));
+  reconnectAttempt++;
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    connect();
+  }, delay);
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible") return;
+  if (ws && ws.readyState === WebSocket.OPEN) return;
+  // Tab is back in front and we're not connected — try right now, don't wait
+  // for the (possibly throttled) backoff timer.
+  if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+  reconnectAttempt = 0;
+  connect();
+});
+
+term.onData((data) => {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(new TextEncoder().encode(data));
+  }
+});
+
+function sendResize() {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(JSON.stringify({ type: "resize", rows: term.rows, cols: term.cols }));
+}
+
+connect();
+
+let resizeTimer;
+window.addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => { fit.fit(); sendResize(); }, 100);
+});
+term.onResize(() => sendResize());
+</script>
+</body>
+</html>

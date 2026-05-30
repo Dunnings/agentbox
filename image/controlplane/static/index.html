@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>agentbox</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/static/common.css">
+<script src="/static/settings.js"></script>
+<style>
+  /* Base reset, body, and --sans/--mono tokens live in common.css, which also
+     self-hosts the Roboto @font-face. The homepage uses Roboto for everything —
+     body copy and the monospaced session names alike — so put it first in both
+     tokens. No CDN: the bundled /static/fonts/Roboto-variable.woff2 is used. */
+  :root {
+    --sans: "Roboto", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Cantarell, "Noto Sans", sans-serif;
+    --mono: "Roboto", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Cantarell, "Noto Sans", sans-serif;
+  }
+  body { min-height: 100vh; line-height: 1.5; }
+
+  .container {
+    max-width: 80rem;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 4rem;
+  }
+
+  header.page {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    margin-bottom: 2rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid var(--border);
+  }
+  header.page h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  header.page .sub { font-size: 0.9rem; color: var(--muted); }
+  header.page .spacer { margin-left: auto; }
+  header.page .count { font-size: 0.8rem; color: var(--muted); }
+
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 22rem;
+    gap: 1.5rem;
+    align-items: start;
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .panel > h2 {
+    margin: 0;
+    padding: 0.85rem 1.1rem;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    font-weight: 600;
+    border-bottom: 1px solid var(--border);
+  }
+  .panel-body { padding: 0.5rem; }
+
+  .sessions { display: flex; flex-direction: column; gap: 0.15rem; }
+  .session {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.7rem 0.9rem;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background 0.08s ease;
+  }
+  .session:hover { background: var(--panel-h); }
+  .session .name {
+    font-family: var(--mono);
+    font-size: 0.95rem;
+    color: var(--accent);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pill {
+    display: inline-block;
+    padding: 0.15rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    background: var(--panel-h);
+    color: var(--muted);
+    font-weight: 500;
+    border: 1px solid var(--border);
+  }
+  .pill.live { background: var(--live-bg); color: var(--live); border-color: transparent; }
+  .pill.warn { background: var(--warn-bg); color: var(--warn); border-color: transparent; }
+
+  .empty {
+    padding: 3rem 1rem;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .empty .arrow { display: inline-block; margin-left: 0.25rem; }
+  @media (max-width: 800px) { .empty .arrow { transform: rotate(90deg); } }
+
+  form { padding: 1.1rem; }
+  form .field { margin-bottom: 0.9rem; }
+  form label {
+    display: flex;
+    align-items: center;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 0.4rem;
+    font-weight: 600;
+  }
+  input, select {
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    font: inherit;
+    font-size: 0.9rem;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--accent); }
+  input::placeholder { color: var(--muted); opacity: 0.5; }
+  select { appearance: none; padding-right: 2rem; }
+
+  button.primary {
+    width: 100%;
+    padding: 0.7rem 1.1rem;
+    background: var(--accent-bg);
+    border: none;
+    color: #fff;
+    border-radius: 6px;
+    cursor: pointer;
+    font: inherit;
+    font-weight: 600;
+    font-size: 0.95rem;
+    margin-top: 0.4rem;
+    transition: background 0.08s ease;
+  }
+  button.primary:hover { background: var(--accent-bg-h); }
+  button.primary:active { transform: translateY(1px); }
+
+  button.regen {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 0.05rem 0.45rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+    border-radius: 3px;
+    margin-left: 0.5rem;
+    line-height: 1.3;
+    font: inherit;
+  }
+  button.regen:hover { color: var(--text); border-color: var(--border-strong); }
+
+  .err { color: var(--danger); margin-top: 0.6rem; font-size: 0.85rem; min-height: 1.2em; }
+
+  @media (max-width: 800px) {
+    .container { padding: 1.25rem 1rem 2rem; }
+    .layout { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+    header.page h1 { font-size: 1.25rem; }
+    .session { padding: 0.85rem 0.9rem; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header class="page">
+    <h1>agentbox</h1>
+    <span class="sub">sessions</span>
+    <span class="spacer"></span>
+    <span class="count" id="count"></span>
+    <span id="cog-mount"></span>
+  </header>
+
+  <div class="layout">
+    <section class="panel">
+      <h2>Sessions</h2>
+      <div class="panel-body">
+        <div class="sessions" id="sessions"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Spawn agent</h2>
+      <form id="new" autocomplete="off">
+        <div class="field">
+          <label for="name">name <button type="button" class="regen" id="regen" title="suggest a different name">↻</button></label>
+          <input id="name" name="name" required pattern="[A-Za-z0-9][A-Za-z0-9_\-]{0,63}" placeholder="loading…">
+        </div>
+        <div class="field">
+          <label for="cwd">working directory</label>
+          <input id="cwd" name="cwd" value="/work" required>
+        </div>
+        <div class="field">
+          <label for="command">command</label>
+          <select id="command" name="command"></select>
+        </div>
+        <button type="submit" class="primary">Spawn agent</button>
+        <div class="err" id="err"></div>
+      </form>
+    </section>
+  </div>
+</div>
+
+<script>
+document.getElementById("cog-mount").appendChild(Settings.createCog());
+
+const sessionsEl = document.getElementById("sessions");
+const countEl = document.getElementById("count");
+const errBox = document.getElementById("err");
+const commandSelect = document.getElementById("command");
+
+function refreshCommands() {
+  const { commands } = Settings.get();
+  const prev = commandSelect.value;
+  commandSelect.innerHTML = "";
+  for (const cmd of commands) {
+    if (!cmd) continue;
+    const opt = document.createElement("option");
+    opt.value = cmd;
+    opt.textContent = cmd;
+    commandSelect.appendChild(opt);
+  }
+  if (prev && commands.includes(prev)) commandSelect.value = prev;
+}
+refreshCommands();
+Settings.onChange(refreshCommands);
+
+function emptyMessage() {
+  const wide = window.matchMedia("(min-width: 801px)").matches;
+  const dir = wide ? "→" : "↓";
+  return `<div class="empty">no sessions yet — spawn one<span class="arrow">${dir}</span></div>`;
+}
+
+async function refresh() {
+  let sessions = [];
+  try {
+    const r = await fetch("/api/sessions");
+    if (r.status === 401) { location.href = "/login"; return; }
+    ({ sessions } = await r.json());
+  } catch { return; }
+
+  countEl.textContent = sessions.length
+    ? `${sessions.length} ${sessions.length === 1 ? "session" : "sessions"}`
+    : "";
+
+  if (!sessions.length) {
+    sessionsEl.innerHTML = emptyMessage();
+    return;
+  }
+
+  sessionsEl.replaceChildren();
+  for (const s of sessions) {
+    // Build with textContent / dataset, never innerHTML interpolation: session
+    // names are NOT guaranteed to match the API's NAME_RE. Sessions created
+    // straight from a shell (`tmux new -s '<img onerror=…>'`) carry arbitrary
+    // characters, and the control plane lists every session on the tmux server.
+    // Interpolating those into innerHTML would be a stored-XSS sink.
+    const row = document.createElement("div");
+    row.className = "session";
+    row.dataset.name = s.name;
+
+    const name = document.createElement("span");
+    name.className = "name";
+    name.textContent = s.name;
+
+    const pillClass = s.status === "running" ? "live"
+                    : s.status === "question" ? "warn"
+                    : "";
+    const pill = document.createElement("span");
+    pill.className = "pill" + (pillClass ? " " + pillClass : "");
+    pill.textContent = s.status || "idle";
+
+    const kill = document.createElement("button");
+    kill.className = "icon-btn danger";
+    kill.dataset.name = s.name;
+    kill.title = "kill session";
+    kill.setAttribute("aria-label", "kill session");
+    // Static markup only — no untrusted data — so innerHTML is safe here.
+    kill.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6"/></svg>';
+
+    row.append(name, pill, kill);
+    sessionsEl.appendChild(row);
+  }
+}
+
+sessionsEl.addEventListener("click", async (e) => {
+  const killBtn = e.target.closest("button.icon-btn");
+  if (killBtn && killBtn.dataset.name) {
+    e.stopPropagation();
+    const name = killBtn.dataset.name;
+    if (!confirm(`kill session "${name}"?`)) return;
+    await fetch(`/api/sessions/${encodeURIComponent(name)}`, { method: "DELETE" });
+    refresh();
+    return;
+  }
+  const row = e.target.closest(".session");
+  if (row) location.href = `/t/${encodeURIComponent(row.dataset.name)}`;
+});
+
+document.getElementById("new").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  errBox.textContent = "";
+  const fd = new FormData(e.target);
+  const r = await fetch("/api/sessions", { method: "POST", body: fd });
+  if (!r.ok) {
+    const t = await r.text();
+    try { errBox.textContent = JSON.parse(t).detail || t; } catch { errBox.textContent = t; }
+    return;
+  }
+  const { name } = await r.json();
+  location.href = `/t/${encodeURIComponent(name)}`;
+});
+
+const nameInput = document.getElementById("name");
+let userTouchedName = false;
+nameInput.addEventListener("input", () => { userTouchedName = true; });
+
+async function suggestName({ force = false } = {}) {
+  if (!force && userTouchedName) return;
+  try {
+    const r = await fetch("/api/suggest-name");
+    const { name } = await r.json();
+    nameInput.value = name;
+    if (force) userTouchedName = false;
+  } catch {}
+}
+document.getElementById("regen").addEventListener("click", () => suggestName({ force: true }));
+
+refresh();
+suggestName();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>

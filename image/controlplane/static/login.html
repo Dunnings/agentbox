@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>agentbox — sign in</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/static/common.css">
+<script src="/static/settings.js"></script>
+<style>
+  /* Base reset, body font/colors, and tokens live in common.css. */
+  body { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+  .login {
+    width: min(22rem, 100%);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: var(--shadow);
+  }
+  .login h1 { margin: 0 0 0.25rem; font-size: 1.25rem; letter-spacing: -0.01em; }
+  .login p { margin: 0 0 1.25rem; color: var(--muted); font-size: 0.85rem; }
+  .login label {
+    display: block;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    font-weight: 600;
+    margin-bottom: 0.4rem;
+  }
+  .login input {
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    font: inherit;
+    font-size: 0.9rem;
+  }
+  .login input:focus { outline: none; border-color: var(--accent); }
+  .login button {
+    width: 100%;
+    margin-top: 1rem;
+    padding: 0.7rem 1.1rem;
+    background: var(--accent-bg);
+    border: none;
+    color: #fff;
+    border-radius: 6px;
+    cursor: pointer;
+    font: inherit;
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+  .login button:hover { background: var(--accent-bg-h); }
+  .login .err { color: var(--danger); font-size: 0.85rem; margin-top: 0.75rem; min-height: 1.2em; }
+</style>
+</head>
+<body>
+  <form class="login" method="post" action="/login" autocomplete="off">
+    <h1>agentbox</h1>
+    <p>Enter the password to continue.</p>
+    <label for="password">Password</label>
+    <input type="password" id="password" name="password" autofocus required>
+    <input type="hidden" name="next" id="next" value="/">
+    <button type="submit">Sign in</button>
+    <div class="err" id="err"></div>
+  </form>
+<script>
+  const params = new URLSearchParams(location.search);
+  if (params.get("error")) document.getElementById("err").textContent = "Incorrect password.";
+  const nxt = params.get("next");
+  if (nxt && nxt.startsWith("/") && !nxt.startsWith("//") && !nxt.startsWith("/\\")) document.getElementById("next").value = nxt;
+</script>
+</body>
+</html>

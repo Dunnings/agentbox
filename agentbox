@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# Bring agentbox up (and optionally attach).
+#
+# Usage:
+#   ./agentbox              → just bring the container up (build if needed)
+#                             then exit. Drive it from the browser at
+#                             http://127.0.0.1:9119/.
+#   ./agentbox --attach     → bring up + attach to tmux session `main`
+#   ./agentbox shell        → bring up + plain bash, no tmux
+#   ./agentbox <cmd> ...    → bring up + run a command directly, no tmux
+#
+# Inside tmux:
+#   Ctrl-b d       detach (sessions keep running in the container)
+#   Ctrl-b c       new window
+#   Ctrl-b n / p   next / previous window
+#   Ctrl-b "       split pane horizontally
+#   Ctrl-b %       split pane vertically
+set -euo pipefail
+
+cd "$(dirname "$0")"
+
+# .env is optional — agentbox runs fine without secrets if you don't need any
+# git host auth. docker compose still needs the file to exist when env_file
+# references it, so create an empty one if missing.
+#
+# .env holds tokens, so it must be 0600. We enforce that here rather than rely
+# on the file's committed mode: git only records 644/755, so a freshly cloned
+# .env.example is 644 and `cp .env.example .env` inherits that — world-readable.
+# Tightening on every run closes that gap no matter how .env was created.
+if [[ -f .env ]]; then
+  mode="$(stat -c '%a' .env 2>/dev/null || stat -f '%Lp' .env)"
+  if [[ "$mode" != "600" ]]; then
+    chmod 600 .env && echo "note: tightened .env permissions to 600 (was ${mode})" >&2
+  fi
+else
+  : > .env
+  chmod 600 .env
+fi
+
+# Daily cache-bust for the claude-code install layer in the image — picks up
+# new releases without forcing a full --no-cache rebuild. Override with
+# CLAUDE_VERSION=... in the environment to pin or force.
+export CLAUDE_VERSION="${CLAUDE_VERSION:-$(date +%Y%m%d)}"
+
+# Start the Cloudflare Tunnel sidecar only when a token is configured in .env.
+# (Services with profiles stay off unless their profile is activated.) Build a
+# non-empty command array so this stays safe under `set -u` on old bash.
+compose=(docker compose)
+if grep -qE '^[[:space:]]*CLOUDFLARE_TUNNEL_TOKEN=.+' .env 2>/dev/null; then
+  compose+=(--profile tunnel)
+fi
+
+"${compose[@]}" up -d --build
+
+if [[ $# -eq 0 ]]; then
+  exit 0
+elif [[ "$1" == "--attach" ]]; then
+  # Attach to a persistent tmux session named `main`, creating it on first use.
+  # -A = attach if exists, else create; -D = detach other clients (single-seat).
+  exec docker compose exec agentbox \
+    tmux new-session -A -D -s main
+elif [[ "$1" == "shell" ]]; then
+  exec docker compose exec agentbox bash -l
+else
+  exec docker compose exec agentbox "$@"
+fi

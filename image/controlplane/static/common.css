@@ -1,0 +1,241 @@
+/* Base reset + typography tokens — shared by every control-plane page. */
+
+/* Self-hosted Roboto (variable weight, latin subset, Apache-2.0). Served from
+   /static so the UI always has a real sans to render — including minimal Linux
+   and offline viewers that have no system sans-serif installed and would
+   otherwise fall through to the browser's default serif (Times New Roman).
+   Roboto already sits in the --sans stack below; bundling the bytes makes that
+   fallback actually resolve. No third-party CDN — keeps the control plane
+   self-contained and leaks nothing to fonts.googleapis.com on every load. */
+@font-face {
+  font-family: "Roboto";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/static/fonts/Roboto-variable.woff2") format("woff2");
+}
+
+:root {
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Cantarell, Ubuntu, "Noto Sans", sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", "Liberation Mono", "Roboto Mono", "Noto Sans Mono", monospace;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Theme tokens — switched via data-theme on <html>. */
+:root, :root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0e0e10;
+  --panel: #18181b;
+  --panel-h: #1f1f23;
+  --border: #2a2a2e;
+  --border-strong: #3a3a3e;
+  --text: #e7e7e9;
+  --muted: #80808a;
+  --accent: #7ec8ff;
+  --accent-bg: #2a4a8a;
+  --accent-bg-h: #3460b0;
+  --live: #80d480;
+  --live-bg: #1a3a1a;
+  --warn: #e5c07b;
+  --warn-bg: #3a2f1a;
+  --danger: #e08080;
+  --danger-bg: #2a1a1a;
+  --danger-border: #5a2a2a;
+  --modal-backdrop: rgba(0, 0, 0, 0.55);
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f7f7f8;
+  --panel: #ffffff;
+  --panel-h: #f0f0f3;
+  --border: #d4d4d8;
+  --border-strong: #a1a1aa;
+  --text: #18181b;
+  --muted: #71717a;
+  --accent: #1e40af;
+  --accent-bg: #2a4a8a;
+  --accent-bg-h: #1e3a7a;
+  --live: #166534;
+  --live-bg: #d4f5d4;
+  --warn: #92400e;
+  --warn-bg: #fef3c7;
+  --danger: #b91c1c;
+  --danger-bg: #fde2e2;
+  --danger-border: #f0b0b0;
+  --modal-backdrop: rgba(20, 20, 24, 0.35);
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+}
+
+/* Generic icon button — used for cog, trash, etc. */
+.icon-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--muted);
+  width: 2rem;
+  height: 2rem;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font: inherit;
+  flex-shrink: 0;
+  transition: background 0.08s ease, color 0.08s ease, border-color 0.08s ease;
+}
+.icon-btn svg { width: 1rem; height: 1rem; display: block; }
+.icon-btn:hover { color: var(--text); background: var(--panel-h); }
+.icon-btn.bordered { border-color: var(--border); }
+.icon-btn.bordered:hover { border-color: var(--border-strong); }
+.icon-btn.danger:hover { color: var(--danger); background: var(--danger-bg); }
+
+/* Settings modal */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--modal-backdrop);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 1rem;
+  animation: fadeIn 0.12s ease-out;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.modal {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  width: min(32rem, 100%);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1.1rem;
+  border-bottom: 1px solid var(--border);
+}
+.modal-head h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.modal-body { padding: 1.1rem; overflow-y: auto; }
+
+.settings-section { margin-bottom: 1.25rem; }
+.settings-section:last-child { margin-bottom: 0; }
+.settings-section .label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font-weight: 600;
+  margin-bottom: 0.55rem;
+}
+
+.theme-toggle { display: flex; gap: 0.4rem; }
+.theme-toggle button {
+  flex: 1;
+  padding: 0.55rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.9rem;
+  transition: border-color 0.08s ease, background 0.08s ease;
+}
+.theme-toggle button:hover { border-color: var(--border-strong); }
+.theme-toggle button.active {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+  color: #fff;
+}
+
+.zoom-control { display: flex; gap: 0.4rem; align-items: center; }
+.zoom-control button {
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+.zoom-control button:hover { border-color: var(--border-strong); }
+.zoom-control .value {
+  flex: 1;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-family: var(--mono);
+  font-size: 0.95rem;
+}
+
+.commands-list { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.5rem; }
+.command-row { display: flex; gap: 0.4rem; align-items: center; }
+.command-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.5rem 0.65rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 5px;
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+}
+.command-row input:focus { outline: none; border-color: var(--accent); }
+.add-cmd {
+  width: 100%;
+  padding: 0.55rem;
+  border: 1px dashed var(--border);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.85rem;
+  transition: border-color 0.08s ease, color 0.08s ease;
+}
+.add-cmd:hover { color: var(--text); border-color: var(--border-strong); }
+.commands-hint {
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.4;
+  margin-bottom: 0.55rem;
+}
+.commands-actions { display: flex; gap: 0.4rem; }
+.commands-actions .add-cmd { flex: 1; width: auto; }
+.reset-cmd {
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  transition: border-color 0.08s ease, color 0.08s ease;
+}
+.reset-cmd:hover { color: var(--text); border-color: var(--border-strong); }
