@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [main, init]
+  pull_request:
+
+jobs:
+  controlplane:
+    name: control plane (ruff + pytest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: image/controlplane
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install deps
+        run: pip install fastapi "uvicorn[standard]" python-multipart pytest httpx ruff
+      - name: Ruff
+        run: ruff check server.py test_server.py
+      - name: Pytest
+        run: pytest -q
+
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # shellcheck is preinstalled on ubuntu-latest runners.
+      - run: shellcheck agentbox image/entrypoint.sh
+
+  hadolint:
+    name: hadolint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Lint the Dockerfile for genuine problems. The --ignore list below is
+      # deliberate design choices and false positives, not oversights:
+      #   DL3008/DL3013/DL3016  unpinned apt/pip/npm versions — this is a dev
+      #                         sandbox image that tracks "latest" on purpose;
+      #                         pinning every package would rot and break rebuilds.
+      #   DL4006                pipefail before a piped RUN — the `curl | bash`
+      #                         vendor bootstrappers are guarded by `if` blocks;
+      #                         forcing a global bash SHELL is more invasive than
+      #                         the hint is worth.
+      #   DL3046                useradd -l for a "high" UID — the UID is build-arg
+      #                         driven (default 1000) and not actually high;
+      #                         hadolint just can't evaluate ${USER_UID} statically.
+      #   SC2102                `uvicorn[standard]` is pip extras syntax, not a
+      #                         shell character range.
+      #   SC2016                the single-quoted printf into .bashrc writes
+      #                         literal $HOME / \w on purpose.
+      - run: |
+          docker run --rm -i hadolint/hadolint hadolint \
+            --ignore DL3008 --ignore DL3013 --ignore DL3016 \
+            --ignore DL4006 --ignore DL3046 \
+            --ignore SC2102 --ignore SC2016 \
+            - < image/Dockerfile
+
+  build:
+    name: docker build (smoke)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Build with the optional toolchains off — validates the Dockerfile, the
+      # control-plane venv, and the entrypoint wiring without the slow language
+      # layers. The base image always includes git/jq/tmux/python3 + control plane.
+      - name: Build image
+        run: |
+          docker build image \
+            --build-arg INSTALL_NODE=0 \
+            --build-arg INSTALL_BUN=0 \
+            --build-arg INSTALL_RUST=0 \
+            --build-arg INSTALL_DOCKER=0 \
+            --build-arg INSTALL_GH=0 \
+            --build-arg INSTALL_GLAB=0 \
+            --build-arg INSTALL_CLAUDE=0 \
+            -t agentbox:ci

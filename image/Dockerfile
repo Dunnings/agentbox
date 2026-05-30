@@ -58,7 +58,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 # --- Base packages -----------------------------------------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        ca-certificates curl wget gnupg git sudo \
+        ca-certificates curl wget gnupg git \
         build-essential pkg-config libssl-dev \
         unzip xz-utils procps less jq vim-tiny tini tmux \
         openssh-client iproute2 \
@@ -254,12 +254,15 @@ RUN groupadd -g "${USER_GID}" "${USERNAME}" \
 # Mouse on so wheel-up enters copy-mode and scrolls the pane buffer (the web
 # terminal can't use xterm.js scrollback because tmux runs in alt-screen).
 # History bumped well above the 2000-line default so a long Claude session
-# stays scrollable.
+# stays scrollable. window-size latest: when several browser tabs attach to one
+# session, size the window to the most-recently-active client instead of the
+# smallest, so a phone tab no longer squeezes a desktop tab.
 RUN printf '%s\n' \
         'set -g mouse on' \
         'set -g history-limit 50000' \
         'set -g set-clipboard on' \
         "set -as terminal-features 'xterm*:clipboard'" \
+        'set -g window-size latest' \
         'set -g status off' \
     > /etc/tmux.conf
 

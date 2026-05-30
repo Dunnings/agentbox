@@ -264,20 +264,37 @@ async function refresh() {
     return;
   }
 
-  sessionsEl.innerHTML = "";
+  sessionsEl.replaceChildren();
   for (const s of sessions) {
+    // Build with textContent / dataset, never innerHTML interpolation: session
+    // names are NOT guaranteed to match the API's NAME_RE. Sessions created
+    // straight from a shell (`tmux new -s '<img onerror=…>'`) carry arbitrary
+    // characters, and the control plane lists every session on the tmux server.
+    // Interpolating those into innerHTML would be a stored-XSS sink.
     const row = document.createElement("div");
     row.className = "session";
     row.dataset.name = s.name;
+
+    const name = document.createElement("span");
+    name.className = "name";
+    name.textContent = s.name;
+
     const pillClass = s.status === "running" ? "live"
                     : s.status === "question" ? "warn"
                     : "";
-    row.innerHTML = `
-      <span class="name">${s.name}</span>
-      <span class="pill ${pillClass}">${s.status || "idle"}</span>
-      <button class="icon-btn danger" data-name="${s.name}" title="kill session" aria-label="kill session">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6"/></svg>
-      </button>`;
+    const pill = document.createElement("span");
+    pill.className = "pill" + (pillClass ? " " + pillClass : "");
+    pill.textContent = s.status || "idle";
+
+    const kill = document.createElement("button");
+    kill.className = "icon-btn danger";
+    kill.dataset.name = s.name;
+    kill.title = "kill session";
+    kill.setAttribute("aria-label", "kill session");
+    // Static markup only — no untrusted data — so innerHTML is safe here.
+    kill.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6"/></svg>';
+
+    row.append(name, pill, kill);
     sessionsEl.appendChild(row);
   }
 }
