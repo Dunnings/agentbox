@@ -15,6 +15,7 @@ import os
 import pty
 import random
 import re
+import shutil
 import signal
 import struct
 import subprocess
@@ -164,6 +165,44 @@ def logout():
 
 
 SHELL_CMDS = {"bash", "zsh", "sh", "fish", "ash", "dash", "csh", "tcsh", "ksh", "login"}
+
+# Default session commands offered in the UI, keyed by the binary that must be
+# on PATH for the command to make sense. agentbox installs its toolchains
+# opt-in (the INSTALL_* build flags), so the launchable set differs per
+# container — /api/commands filters this catalog down to what's actually here.
+# Order here is the order the dropdown shows them.
+COMMAND_CATALOG = [
+    # AI coding agents
+    ("claude",   "claude --dangerously-skip-permissions"),
+    ("codex",    "codex"),
+    ("gemini",   "gemini"),
+    ("copilot",  "copilot"),
+    ("aider",    "aider"),
+    # Shells
+    ("bash",     "bash -l"),
+    ("zsh",      "zsh -l"),
+    ("fish",     "fish -l"),
+    # Language runtimes / REPLs
+    ("node",     "node"),
+    ("python3",  "python3"),
+    ("ipython",  "ipython"),
+    ("bun",      "bun repl"),
+    ("deno",     "deno"),
+    ("irb",      "irb"),
+]
+
+
+def detected_commands() -> list[str]:
+    """Launch commands whose underlying tool is installed in this container.
+
+    Lets the front end default the new-session command dropdown to what this
+    box can actually run rather than a hardcoded list. Always returns at least
+    a login shell so the dropdown is never empty.
+    """
+    cmds = [cmd for binary, cmd in COMMAND_CATALOG if shutil.which(binary)]
+    return cmds or ["bash -l"]
+
+
 CLAUDE_IDLE_HINTS = ("shift+tab", "? for shortcuts", "Bypass permissions")
 QUESTION_RE = re.compile(r"❯\s+1\.")
 
@@ -282,6 +321,12 @@ def list_sessions():
 @app.get("/api/suggest-name")
 def api_suggest_name():
     return {"name": suggest_name()}
+
+
+@app.get("/api/commands")
+def api_commands():
+    """The default session commands available in this container."""
+    return {"commands": detected_commands()}
 
 
 @app.post("/api/sessions")

@@ -218,3 +218,24 @@ body {
   transition: border-color 0.08s ease, color 0.08s ease;
 }
 .add-cmd:hover { color: var(--text); border-color: var(--border-strong); }
+.commands-hint {
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.4;
+  margin-bottom: 0.55rem;
+}
+.commands-actions { display: flex; gap: 0.4rem; }
+.commands-actions .add-cmd { flex: 1; width: auto; }
+.reset-cmd {
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  transition: border-color 0.08s ease, color 0.08s ease;
+}
+.reset-cmd:hover { color: var(--text); border-color: var(--border-strong); }

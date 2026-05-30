@@ -3,14 +3,17 @@
 // that any page can drop into its header.
 (function () {
   const STORAGE_KEY = "agentbox.settings.v1";
+  // commands: null means "follow the server-detected default set" (the set of
+  // launch commands whose tool is actually installed in this container). An
+  // array means the user has customized their list and it should be used
+  // verbatim. See loadDetected() / effectiveCommands().
   const DEFAULTS = Object.freeze({
     theme: "dark",
     zoom: 13,
-    commands: [
-      "claude --dangerously-skip-permissions",
-      "bash -l",
-    ],
+    commands: null,
   });
+  // Shown only until /api/commands responds, or if it can't be reached.
+  const FALLBACK_COMMANDS = Object.freeze(["bash -l"]);
 
   function load() {
     try {
@@ -20,9 +23,9 @@
       return {
         theme: parsed.theme === "light" ? "light" : "dark",
         zoom: clampZoom(parsed.zoom ?? DEFAULTS.zoom),
-        commands: Array.isArray(parsed.commands) && parsed.commands.length
+        commands: Array.isArray(parsed.commands)
           ? parsed.commands.filter((c) => typeof c === "string")
-          : [...DEFAULTS.commands],
+          : null,
       };
     } catch {
       return { ...DEFAULTS };
@@ -35,7 +38,34 @@
   }
 
   let state = load();
+  let detected = null; // commands reported by /api/commands; null until fetched
   const listeners = new Set();
+
+  // The list the UI should actually show: the user's custom list if they have
+  // one, otherwise the server-detected set, falling back to a login shell.
+  function effectiveCommands() {
+    if (Array.isArray(state.commands)) return [...state.commands];
+    if (Array.isArray(detected)) return [...detected];
+    return [...FALLBACK_COMMANDS];
+  }
+
+  function notify() {
+    for (const fn of listeners) {
+      try { fn(state); } catch (e) { console.error(e); }
+    }
+  }
+
+  async function loadDetected() {
+    try {
+      const r = await fetch("/api/commands");
+      if (!r.ok) return;
+      const { commands } = await r.json();
+      if (Array.isArray(commands) && commands.length) {
+        detected = commands.filter((c) => typeof c === "string");
+        notify(); // refresh consumers that are following the detected set
+      }
+    } catch { /* keep FALLBACK_COMMANDS */ }
+  }
 
   function save() {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
@@ -46,9 +76,7 @@
     if (patch.zoom !== undefined) state.zoom = clampZoom(state.zoom);
     save();
     applyTheme();
-    for (const fn of listeners) {
-      try { fn(state); } catch (e) { console.error(e); }
-    }
+    notify();
   }
 
   function applyTheme() {
@@ -116,8 +144,12 @@
           </div>\
           <div class="settings-section">\
             <div class="label">Commands</div>\
+            <div class="commands-hint hint"></div>\
             <div class="commands-list"></div>\
-            <button class="add-cmd" type="button">+ Add command</button>\
+            <div class="commands-actions">\
+              <button class="add-cmd" type="button">+ Add command</button>\
+              <button class="reset-cmd" type="button">Reset to detected</button>\
+            </div>\
           </div>\
         </div>\
       </div>';
@@ -156,9 +188,17 @@
     refreshZoom();
 
     const list = backdrop.querySelector(".commands-list");
+    const hint = backdrop.querySelector(".commands-hint");
+    const resetBtn = backdrop.querySelector(".reset-cmd");
     function refreshCommands() {
       list.innerHTML = "";
-      state.commands.forEach((cmd, i) => {
+      const customized = Settings.get().customized;
+      hint.textContent = customized
+        ? "Custom list — overrides the tools detected in this container."
+        : "Auto-detected from the tools installed in this container.";
+      resetBtn.style.display = customized ? "" : "none";
+      // Snapshot the effective list; edits promote it to the user's own copy.
+      effectiveCommands().forEach((cmd, i) => {
         const row = document.createElement("div");
         row.className = "command-row";
         const input = document.createElement("input");
@@ -166,16 +206,17 @@
         input.value = cmd;
         input.placeholder = "e.g. claude --dangerously-skip-permissions";
         input.addEventListener("change", () => {
-          const next = [...state.commands];
+          const next = effectiveCommands();
           next[i] = input.value;
           update({ commands: next });
+          refreshCommands();
         });
         const del = document.createElement("button");
         del.className = "icon-btn danger";
         del.setAttribute("aria-label", "remove command");
         del.innerHTML = TRASH_SVG;
         del.addEventListener("click", () => {
-          update({ commands: state.commands.filter((_, j) => j !== i) });
+          update({ commands: effectiveCommands().filter((_, j) => j !== i) });
           refreshCommands();
         });
         row.appendChild(input);
@@ -184,10 +225,14 @@
       });
     }
     backdrop.querySelector(".add-cmd").addEventListener("click", () => {
-      update({ commands: [...state.commands, ""] });
+      update({ commands: [...effectiveCommands(), ""] });
       refreshCommands();
       const last = list.querySelector(".command-row:last-child input");
       if (last) last.focus();
+    });
+    resetBtn.addEventListener("click", () => {
+      update({ commands: null }); // null = follow server-detected set again
+      refreshCommands();
     });
     refreshCommands();
   }
@@ -205,10 +250,19 @@
   applyTheme();
 
   window.Settings = {
-    get: () => ({ ...state, commands: [...state.commands] }),
+    get: () => ({
+      theme: state.theme,
+      zoom: state.zoom,
+      commands: effectiveCommands(),
+      // true when the list is the user's own, false when it follows the
+      // server-detected default set.
+      customized: Array.isArray(state.commands),
+    }),
     onChange: (fn) => { listeners.add(fn); return () => listeners.delete(fn); },
     createCog,
     open,
     terminalTheme: () => TERM_THEMES[state.theme],
   };
+
+  loadDetected();
 })();
