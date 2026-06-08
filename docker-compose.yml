@@ -19,6 +19,7 @@ services:
         INSTALL_GH: ${INSTALL_GH:-1}
         INSTALL_GLAB: ${INSTALL_GLAB:-1}
         INSTALL_CLAUDE: ${INSTALL_CLAUDE:-1}
+        INSTALL_PLAYWRIGHT: ${INSTALL_PLAYWRIGHT:-1}
         # Extra languages & utilities (opt-in)
         INSTALL_PYTHON: ${INSTALL_PYTHON:-0}
         INSTALL_GO: ${INSTALL_GO:-0}
@@ -28,7 +29,6 @@ services:
         INSTALL_YQ: ${INSTALL_YQ:-0}
         INSTALL_SHELLCHECK: ${INSTALL_SHELLCHECK:-0}
         INSTALL_DB_CLIENTS: ${INSTALL_DB_CLIENTS:-0}
-        INSTALL_PLAYWRIGHT: ${INSTALL_PLAYWRIGHT:-0}
         # CLI AI coding agents (opt-in)
         INSTALL_COPILOT: ${INSTALL_COPILOT:-0}
         INSTALL_CODEX: ${INSTALL_CODEX:-0}

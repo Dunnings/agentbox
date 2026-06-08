@@ -64,6 +64,7 @@ INSTALL_DOCKER=1    # docker CLI + compose/buildx plugins
 INSTALL_GH=1        # GitHub CLI
 INSTALL_GLAB=1      # GitLab CLI
 INSTALL_CLAUDE=1    # Claude Code (needs INSTALL_NODE=1)
+INSTALL_PLAYWRIGHT=1 # headless Chromium + system libs for browser tests/screenshots (needs INSTALL_NODE=1)
 ```
 
 **Extra languages & utilities — off by default** (set to `1` to add):
@@ -77,7 +78,6 @@ INSTALL_SEARCH=0    # ripgrep (rg), fd, fzf
 INSTALL_YQ=0        # yq — YAML/JSON processor (companion to jq)
 INSTALL_SHELLCHECK=0
 INSTALL_DB_CLIENTS=0 # psql, sqlite3, redis-cli
-INSTALL_PLAYWRIGHT=0 # headless Chromium + system libs for browser tests/screenshots (needs INSTALL_NODE=1)
 ```
 
 **CLI AI coding agents — off by default** (set to `1` to add):
