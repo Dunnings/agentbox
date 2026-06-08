@@ -64,6 +64,7 @@ INSTALL_DOCKER=1    # docker CLI + compose/buildx plugins
 INSTALL_GH=1        # GitHub CLI
 INSTALL_GLAB=1      # GitLab CLI
 INSTALL_CLAUDE=1    # Claude Code (needs INSTALL_NODE=1)
+INSTALL_PLAYWRIGHT=1 # headless Chromium + system libs for browser tests/screenshots (needs INSTALL_NODE=1)
 ```
 
 **Extra languages & utilities — off by default** (set to `1` to add):

@@ -19,6 +19,7 @@ services:
         INSTALL_GH: ${INSTALL_GH:-1}
         INSTALL_GLAB: ${INSTALL_GLAB:-1}
         INSTALL_CLAUDE: ${INSTALL_CLAUDE:-1}
+        INSTALL_PLAYWRIGHT: ${INSTALL_PLAYWRIGHT:-1}
         # Extra languages & utilities (opt-in)
         INSTALL_PYTHON: ${INSTALL_PYTHON:-0}
         INSTALL_GO: ${INSTALL_GO:-0}

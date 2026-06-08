@@ -88,7 +88,8 @@ not be installed — **check with `command -v` before assuming one exists**:
 - Languages/runtimes: Node.js 22 + npm, Bun, Rust (`rustc`, `cargo`), Go,
   Deno, Ruby, and Python dev tooling (pip, pipx, `uv`).
 - Utilities: `gh`, `glab`, `docker` (+ `compose`/`buildx`), `rg`/`fd`/`fzf`,
-  `yq`, `shellcheck`, and DB clients (`psql`, `sqlite3`, `redis-cli`).
+  `yq`, `shellcheck`, DB clients (`psql`, `sqlite3`, `redis-cli`), and
+  Playwright (headless Chromium + deps; `PLAYWRIGHT_BROWSERS_PATH=/ms-playwright`).
 - CLI AI agents: Claude Code, GitHub Copilot, OpenAI Codex, Google Gemini,
   Aider.
 

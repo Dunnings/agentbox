@@ -29,6 +29,8 @@ ARG INSTALL_DOCKER=1
 ARG INSTALL_GH=1
 ARG INSTALL_GLAB=1
 ARG INSTALL_CLAUDE=1
+# Playwright (headless Chromium + system libs) — also needs INSTALL_NODE=1.
+ARG INSTALL_PLAYWRIGHT=1
 #
 # Extra languages & utilities — OFF by default (opt in by setting to 1 in .env).
 # INSTALL_PYTHON adds dev tooling (pip + pipx + uv); the python3 interpreter
@@ -43,6 +45,7 @@ ARG INSTALL_SHELLCHECK=0
 ARG INSTALL_DB_CLIENTS=0
 ARG GO_VERSION=1.23.4
 ARG YQ_VERSION=4.44.3
+ARG PLAYWRIGHT_VERSION=1.49.1
 #
 # CLI AI coding agents — OFF by default (opt in by setting to 1 in .env).
 # Copilot/Codex/Gemini install via npm (need INSTALL_NODE=1); Aider installs
@@ -199,6 +202,24 @@ RUN if [ "$INSTALL_DB_CLIENTS" = "1" ]; then \
              postgresql-client redis-tools sqlite3 \
         && rm -rf /var/lib/apt/lists/* ; \
     else echo "INSTALL_DB_CLIENTS=0 — skipping database clients"; fi
+
+# --- Playwright (headless Chromium + the system libraries it needs) ----------
+# Browser end-to-end testing / screenshotting. The hard part in a slim image is
+# the browser's shared libraries (libnss3, libgbm1, …), which need root to apt-
+# install — so we bake them in here. Chromium itself is installed into a shared,
+# world-writable PLAYWRIGHT_BROWSERS_PATH (the convention the official
+# Playwright images use) so any project's `playwright` finds it with no
+# per-project download and no root. Needs Node (npx) + network at build time.
+# Bump PLAYWRIGHT_VERSION to match the Playwright npm version your projects use.
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN mkdir -p /ms-playwright && chmod -R a+rwX /ms-playwright \
+    && if [ "$INSTALL_PLAYWRIGHT" = "1" ]; then \
+        if command -v npx >/dev/null 2>&1; then \
+            npx --yes playwright@${PLAYWRIGHT_VERSION} install --with-deps chromium \
+            && chmod -R a+rwX /ms-playwright \
+            && rm -rf /var/lib/apt/lists/* ; \
+        else echo "WARN: INSTALL_PLAYWRIGHT=1 but Node is missing (INSTALL_NODE=0) — skipping Playwright"; fi ; \
+    else echo "INSTALL_PLAYWRIGHT=0 — skipping Playwright"; fi
 
 # === CLI AI coding agents (opt-in) ===========================================
 # npm-based agents (Copilot, Codex, Gemini) need Node; Aider needs pipx (the
