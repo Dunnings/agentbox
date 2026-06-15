@@ -67,6 +67,12 @@ seed_dir() {
   cp -r --preserve=mode,timestamps "$src/." "$dst/"
   echo "seeded ${dst} from ${src}"
 }
+# Repo-carried seed (always on): files committed under the checkout's
+# `seed/home` are bind-mounted here read-only and synced into /home/dev on every
+# start. This is how a personal branch (e.g. `david`) carries Claude memories
+# and custom skills so a fresh checkout-and-spin-up reproduces them. Applied
+# BEFORE the optional host SEED_HOME so a user's SEED_HOME can still override.
+seed_dir /etc/agentbox/repo-seed-home "${HOME_DIR}"
 seed_dir /etc/agentbox/seed-home "${HOME_DIR}"
 seed_dir /etc/agentbox/seed-work  /work
 

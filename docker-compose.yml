@@ -76,6 +76,13 @@ services:
     volumes:
       - work:/work
       - home:/home/dev
+      # Repo-carried seed (always on): the checked-out branch's `seed/home` dir
+      # is synced into /home/dev on every start by the entrypoint. This is how a
+      # personal branch carries Claude memories + custom skills, so a fresh
+      # checkout-and-spin-up reproduces them with no host-side config. The
+      # relative path resolves against the repo root (where `./agentbox` runs
+      # compose).
+      - ./seed/home:/etc/agentbox/repo-seed-home:ro
       # Optional seed dirs copied into /home/dev and /work on startup (see
       # SEED_HOME / SEED_WORK in .env). Read-only. Unset → /dev/null, which the
       # entrypoint detects as "no seed" and skips.

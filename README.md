@@ -110,6 +110,32 @@ with their permissions preserved (a `600` `.npmrc` stays `600`). It's a
 sync-on-run, so seeded files overwrite their counterparts each start, while
 anything not in the seed dir is left alone. Unset → skipped.
 
+#### Repo-carried seed (`seed/home`)
+
+`SEED_HOME` points at a *host* path set in `.env`, so it doesn't travel with
+the repo. For things you want a branch to carry with it, commit them under
+`seed/home/` in the repo instead — it's bind-mounted (read-only) and synced
+into `/home/dev` on every start, before the optional `SEED_HOME`. No `.env`
+config needed: check out the branch, `./agentbox`, and the files are there.
+
+This is what the personal **`david`** branch uses to persist Claude Code state
+across servers — without it, memories and skills live only in the `home`
+volume and vanish when the container is recreated on a different host. The
+branch carries:
+
+```
+seed/home/.claude/projects/-work/memory   # Claude's persistent memories
+seed/home/.claude/skills                  # custom skills (e.g. daily-summary)
+```
+
+To reproduce that state on another machine: `git checkout david`, then
+`./agentbox`. To push freshly-made memories/skills back to the branch from
+inside the container, run [`scripts/sync-claude.sh`](scripts/sync-claude.sh) —
+it mirrors `~/.claude` memories + skills into `seed/home` and commits/pushes to
+the current branch. (Because the seed overwrites counterparts on every start,
+sync before recreating the container or live-but-unsynced edits revert to the
+committed version.)
+
 ### Other entry points
 
 ```sh
