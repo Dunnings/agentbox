@@ -48,7 +48,7 @@ Section order: **General → one section per repo → Still open / in progress �
 
 ## CRITICAL — formatting rules
 
-- Section names are plain text lines (e.g. just `hearth`) — no `#`/`##`.
+- Section names are bold text lines (e.g. `**hearth**`) — no `#`/`##`.
 - Every item is a markdown bullet: `- ` prefix, no indentation.
 - NO blank line between a section name and its bullets — the bullets start on
   the very next line.
@@ -57,21 +57,21 @@ Section order: **General → one section per repo → Still open / in progress �
 ### Shape
 
 ```
-General
+**General**
 - Some random calls
 - Internal support for hizi engine
 
-hearth
+**hearth**
 - Add Activity feed with per-user read/unread + mark-as-read
 - Remove the "Staff/Client view" banner on desktop too
 
-hizi-engine
+**hizi-engine**
 - feat(gamble): never offer card/ladder gamble below stake
 
-Still open / in progress
+**Still open / in progress**
 - (nothing left open — everything opened today was merged)
 
-Summary
+**Summary**
 - 14 MRs merged across 3 repos. <headline themes…>
 ```
 
