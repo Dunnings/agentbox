@@ -6,4 +6,3 @@
 - [Fold into open MR](feedback_fold_into_open_mr.md) — put related follow-up fixes on the existing open MR's branch, don't spin up a new MR
 - [MR description structure](feedback_mr_description_structure.md) — MR/PR body as ## Problem / Fix / Surfacing / Tests + a reviewer design note
 - [Persist memories to agentbox](feedback_persist_memories_to_agentbox.md) — after any memory/skill change, run sync-claude.sh to push it to the agentbox `david` branch
-- [progressionAwards shape](project_progression_awards.md) — entry-level = counter→step→increment (nested); flat only per-win; datamodels !226 + engine !88 fix stores, reviewed w/ findings
