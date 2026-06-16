@@ -11,6 +11,9 @@
     theme: "dark",
     zoom: 13,
     commands: null,
+    // The command last used to spawn an agent. Remembered so the spawn form
+    // defaults back to it next visit. null until the user spawns something.
+    lastCommand: null,
   });
   // Shown only until /api/commands responds, or if it can't be reached.
   const FALLBACK_COMMANDS = Object.freeze(["bash -l"]);
@@ -41,6 +44,7 @@
         theme: parsed.theme === "light" ? "light" : "dark",
         zoom: clampZoom(parsed.zoom ?? DEFAULTS.zoom),
         commands,
+        lastCommand: typeof parsed.lastCommand === "string" ? parsed.lastCommand : null,
       };
     } catch {
       return { ...DEFAULTS };
@@ -274,6 +278,16 @@
       customized: Array.isArray(state.commands),
     }),
     onChange: (fn) => { listeners.add(fn); return () => listeners.delete(fn); },
+    // The command last used to spawn an agent (null if none yet). Persisted to
+    // localStorage so the spawn form can default to it across visits. Setting
+    // it doesn't notify onChange listeners — it's not part of the visible
+    // settings UI, just a remembered form value.
+    getLastCommand: () => state.lastCommand,
+    setLastCommand: (cmd) => {
+      if (typeof cmd !== "string" || !cmd) return;
+      state = { ...state, lastCommand: cmd };
+      save();
+    },
     createCog,
     open,
     terminalTheme: () => TERM_THEMES[state.theme],
