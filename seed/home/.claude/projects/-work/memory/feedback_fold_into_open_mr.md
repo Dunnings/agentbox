@@ -20,3 +20,12 @@ merge-ordering/conflict friction (both touched the same file), and add overhead.
 new change is related or co-located, cherry-pick/commit onto that branch and push
 to update the MR. Only open a new MR when the work is genuinely independent or the
 other MR is already merged. When unsure which open MR, ask. See [[mr-reviewer]].
+
+"Related" is broad: it includes **same-area product/feature changes, not just
+bug fixes** — even when the new change feels like a conceptually distinct
+decision. On the hizi-engine-creator buy-feature work I folded a redundant-file
+cleanup into MR !143 but then opened a *separate* MR !144 for "remove the stake
+boost mode" because it felt like a distinct product call. David: "I wanted it in
+the same MR." Same subsystem + open MR ⇒ fold it (cherry-pick onto the branch,
+update title/description to cover both, close the stray MR). Default to folding;
+only split when the topics are unrelated.
