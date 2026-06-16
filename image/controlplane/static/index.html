@@ -229,7 +229,12 @@ function refreshCommands() {
   const { commands } = Settings.get();
   // Keep the current selection if there is one; otherwise fall back to the
   // command last used to spawn an agent (remembered across visits).
-  const prev = commandSelect.value || Settings.getLastCommand();
+  // Optional-call getLastCommand: index.html and settings.js are cached
+  // independently, so right after an upgrade a browser can run this new page
+  // against a stale settings.js that predates the method. Without the `?.` the
+  // resulting TypeError would abort this top-level init script and take the
+  // command dropdown AND the name suggestion (run further down) down with it.
+  const prev = commandSelect.value || Settings.getLastCommand?.();
   commandSelect.innerHTML = "";
   for (const cmd of commands) {
     if (!cmd) continue;
@@ -320,7 +325,9 @@ document.getElementById("new").addEventListener("submit", async (e) => {
   errBox.textContent = "";
   const fd = new FormData(e.target);
   // Remember the chosen command so the form defaults to it next visit.
-  Settings.setLastCommand(commandSelect.value);
+  // Optional-call for the same reason as getLastCommand above: a stale cached
+  // settings.js may not have this method yet, and a spawn must still work.
+  Settings.setLastCommand?.(commandSelect.value);
   const r = await fetch("/api/sessions", { method: "POST", body: fd });
   if (!r.ok) {
     const t = await r.text();
