@@ -225,16 +225,26 @@ const countEl = document.getElementById("count");
 const errBox = document.getElementById("err");
 const commandSelect = document.getElementById("command");
 
+// Set once the user actively chooses a command from the dropdown, so a
+// re-render (settings change, detection arriving) keeps their pick. We can't
+// just read commandSelect.value for this: the first render runs before
+// /api/commands resolves, so the list is the fallback (["bash -l"]) and the
+// select auto-selects "bash -l". Treating that interim value as a "current
+// selection" would clobber the remembered command once the real list arrives —
+// which is exactly what broke remember-last-command.
+let userPickedCommand = false;
+commandSelect.addEventListener("change", () => { userPickedCommand = true; });
+
 function refreshCommands() {
   const { commands } = Settings.get();
-  // Keep the current selection if there is one; otherwise fall back to the
-  // command last used to spawn an agent (remembered across visits).
-  // Optional-call getLastCommand: index.html and settings.js are cached
-  // independently, so right after an upgrade a browser can run this new page
-  // against a stale settings.js that predates the method. Without the `?.` the
-  // resulting TypeError would abort this top-level init script and take the
-  // command dropdown AND the name suggestion (run further down) down with it.
-  const prev = commandSelect.value || Settings.getLastCommand?.();
+  // Preserve an explicit in-session pick; otherwise restore the command last
+  // used to spawn an agent (remembered across visits). Optional-call
+  // getLastCommand: index.html and settings.js are cached independently, so
+  // right after an upgrade a browser can run this new page against a stale
+  // settings.js that predates the method. Without the `?.` the resulting
+  // TypeError would abort this top-level init script and take the command
+  // dropdown AND the name suggestion (run further down) down with it.
+  const want = (userPickedCommand && commandSelect.value) || Settings.getLastCommand?.();
   commandSelect.innerHTML = "";
   for (const cmd of commands) {
     if (!cmd) continue;
@@ -243,7 +253,7 @@ function refreshCommands() {
     opt.textContent = cmd;
     commandSelect.appendChild(opt);
   }
-  if (prev && commands.includes(prev)) commandSelect.value = prev;
+  if (want && commands.includes(want)) commandSelect.value = want;
 }
 refreshCommands();
 Settings.onChange(refreshCommands);
