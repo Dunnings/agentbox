@@ -227,7 +227,9 @@ const commandSelect = document.getElementById("command");
 
 function refreshCommands() {
   const { commands } = Settings.get();
-  const prev = commandSelect.value;
+  // Keep the current selection if there is one; otherwise fall back to the
+  // command last used to spawn an agent (remembered across visits).
+  const prev = commandSelect.value || Settings.getLastCommand();
   commandSelect.innerHTML = "";
   for (const cmd of commands) {
     if (!cmd) continue;
@@ -317,6 +319,8 @@ document.getElementById("new").addEventListener("submit", async (e) => {
   e.preventDefault();
   errBox.textContent = "";
   const fd = new FormData(e.target);
+  // Remember the chosen command so the form defaults to it next visit.
+  Settings.setLastCommand(commandSelect.value);
   const r = await fetch("/api/sessions", { method: "POST", body: fd });
   if (!r.ok) {
     const t = await r.text();
