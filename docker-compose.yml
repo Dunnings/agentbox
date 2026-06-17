@@ -33,6 +33,7 @@ services:
         INSTALL_COPILOT: ${INSTALL_COPILOT:-0}
         INSTALL_CODEX: ${INSTALL_CODEX:-0}
         INSTALL_GEMINI: ${INSTALL_GEMINI:-0}
+        INSTALL_OPENCODE: ${INSTALL_OPENCODE:-0}
         INSTALL_AIDER: ${INSTALL_AIDER:-0}
     image: agentbox:latest
     container_name: agentbox
