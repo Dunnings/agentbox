@@ -249,11 +249,12 @@ SHELL_CMDS = {"bash", "zsh", "sh", "fish", "ash", "dash", "csh", "tcsh", "ksh", 
 # Order here is the order the dropdown shows them.
 COMMAND_CATALOG = [
     # AI coding agents
-    ("claude",   "claude --dangerously-skip-permissions"),
-    ("codex",    "codex"),
-    ("gemini",   "gemini"),
-    ("copilot",  "copilot"),
-    ("aider",    "aider"),
+    ("claude",    "claude --dangerously-skip-permissions"),
+    ("opencode",  "opencode"),
+    ("codex",     "codex"),
+    ("gemini",    "gemini"),
+    ("copilot",   "copilot"),
+    ("aider",     "aider"),
     # Shells
     ("bash",     "bash -l"),
     ("zsh",      "zsh -l"),
