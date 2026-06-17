@@ -18,4 +18,4 @@ To fix a bug for a deployed version, do NOT use `main` — patch the matching **
 
 After publish, bump the consuming engine's pin to the new `X.Y.Z-N` and regenerate its lockfile with `npm install`.
 
-Example: stakeboost collect-crash fixed on branch `6.1.17` as `6.1.17-1` (slot-backend!261). See [[feedback_fold_into_open_mr]], [[feedback_glab_mr_flags]].
+See [[feedback_fold_into_open_mr]], [[feedback_glab_mr_flags]].
