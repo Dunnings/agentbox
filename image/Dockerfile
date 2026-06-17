@@ -248,7 +248,7 @@ RUN if [ "$INSTALL_GEMINI" = "1" ]; then \
 
 # --- opencode (via npm) ------------------------------------------------------
 RUN if [ "$INSTALL_OPENCODE" = "1" ]; then \
-        if command -v npm >/dev/null 2>&1; then npm install -g opencode ; \
+        if command -v npm >/dev/null 2>&1; then npm install -g opencode-ai ; \
         else echo "WARN: INSTALL_OPENCODE=1 but Node is missing (INSTALL_NODE=0) — skipping"; fi ; \
     else echo "INSTALL_OPENCODE=0 — skipping opencode"; fi
 
