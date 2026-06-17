@@ -91,7 +91,7 @@ not be installed — **check with `command -v` before assuming one exists**:
   `yq`, `shellcheck`, DB clients (`psql`, `sqlite3`, `redis-cli`), and
   Playwright (headless Chromium + deps; `PLAYWRIGHT_BROWSERS_PATH=/ms-playwright`).
 - CLI AI agents: Claude Code, GitHub Copilot, OpenAI Codex, Google Gemini,
-  Aider.
+  opencode, Aider.
 
 Whatever is installed is on `$PATH`.
 
