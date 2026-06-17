@@ -48,11 +48,13 @@ ARG YQ_VERSION=4.44.3
 ARG PLAYWRIGHT_VERSION=1.49.1
 #
 # CLI AI coding agents — OFF by default (opt in by setting to 1 in .env).
-# Copilot/Codex/Gemini install via npm (need INSTALL_NODE=1); Aider installs
-# via pipx (needs INSTALL_PYTHON=1). Claude Code is in the standard set above.
+# Copilot/Codex/Gemini/opencode install via npm (need INSTALL_NODE=1); Aider
+# installs via pipx (needs INSTALL_PYTHON=1). Claude Code is in the standard
+# set above.
 ARG INSTALL_COPILOT=0
 ARG INSTALL_CODEX=0
 ARG INSTALL_GEMINI=0
+ARG INSTALL_OPENCODE=0
 ARG INSTALL_AIDER=0
 
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -243,6 +245,12 @@ RUN if [ "$INSTALL_GEMINI" = "1" ]; then \
         if command -v npm >/dev/null 2>&1; then npm install -g @google/gemini-cli ; \
         else echo "WARN: INSTALL_GEMINI=1 but Node is missing (INSTALL_NODE=0) — skipping"; fi ; \
     else echo "INSTALL_GEMINI=0 — skipping Google Gemini CLI"; fi
+
+# --- opencode (via npm) ------------------------------------------------------
+RUN if [ "$INSTALL_OPENCODE" = "1" ]; then \
+        if command -v npm >/dev/null 2>&1; then npm install -g opencode ; \
+        else echo "WARN: INSTALL_OPENCODE=1 but Node is missing (INSTALL_NODE=0) — skipping"; fi ; \
+    else echo "INSTALL_OPENCODE=0 — skipping opencode"; fi
 
 # --- Aider (via pipx) --------------------------------------------------------
 RUN if [ "$INSTALL_AIDER" = "1" ]; then \

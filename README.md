@@ -86,6 +86,7 @@ INSTALL_DB_CLIENTS=0 # psql, sqlite3, redis-cli
 INSTALL_COPILOT=0   # GitHub Copilot CLI   (needs INSTALL_NODE=1)
 INSTALL_CODEX=0     # OpenAI Codex CLI     (needs INSTALL_NODE=1)
 INSTALL_GEMINI=0    # Google Gemini CLI    (needs INSTALL_NODE=1)
+INSTALL_OPENCODE=0  # opencode             (needs INSTALL_NODE=1)
 INSTALL_AIDER=0     # Aider                (needs INSTALL_PYTHON=1)
 ```
 
@@ -364,7 +365,7 @@ the sidecar with secrets you wouldn't trust agentbox with.
 
 | Path | Purpose |
 |------|---------|
-| `image/Dockerfile` | Debian 12 base + Python venv for the control plane; toolchains, utilities, and CLI AI agents (Claude Code, Copilot, Codex, Gemini, Aider) toggled via `INSTALL_*` build args — see [Choosing toolchains](#choosing-toolchains) |
+| `image/Dockerfile` | Debian 12 base + Python venv for the control plane; toolchains, utilities, and CLI AI agents (Claude Code, Copilot, Codex, Gemini, opencode, Aider) toggled via `INSTALL_*` build args — see [Choosing toolchains](#choosing-toolchains) |
 | `docker-compose.yml` | Hardening, volumes, resource limits, loopback port publish, dind sidecar, optional cloudflared tunnel sidecar |
 | `image/entrypoint.sh` | Wires up optional GitHub/GitLab credentials from `.env`, backgrounds the control plane with auto-restart |
 | `agentbox` | Build (with daily cache-bust), bring container up; `--attach` to drop into tmux |
