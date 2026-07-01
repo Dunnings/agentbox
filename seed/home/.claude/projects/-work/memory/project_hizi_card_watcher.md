@@ -11,4 +11,4 @@ David's hizi engine Basecamp card table (project 45710420, table 9476253317) is 
 
 Agent comments on Basecamp are posted as David, so they are distinguished by the signature `— Claude (agentbox)` — always include it, and treat comments carrying it as agent-authored. See [[basecamp-cli]].
 
-**Not auto-started:** after a container restart, re-run `tmux new-session -d -s bc-watcher ~/.claude/skills/hizi-card/scripts/watcher.sh` (or wire it into the agentbox entrypoint — not done as of 2026-07-01). State/logs: `~/.local/state/hizi-card-watcher/`.
+**Autostart:** the agentbox entrypoint runs init hooks from `~/.config/agentbox/init.d/` on boot (added in agentbox PR #15, opened 2026-07-01 — check it merged + image rebuilt); the `david` seed branch ships `10-bc-watcher.sh` there, which idempotently starts the `bc-watcher` tmux session. Manual start if down: `tmux new-session -d -s bc-watcher ~/.claude/skills/hizi-card/scripts/watcher.sh`. State/logs: `~/.local/state/hizi-card-watcher/`.

@@ -150,7 +150,9 @@ session (`card-<card_id>`) running `claude --dangerously-skip-permissions
 - Start: `tmux new-session -d -s bc-watcher ~/.claude/skills/hizi-card/scripts/watcher.sh`
 - State/logs: `~/.local/state/hizi-card-watcher/` (high-water mark, processed
   comment IDs, `watcher.log`)
-- The watcher is NOT auto-started on container boot; restart it after a
-  container restart (or wire it into the agentbox entrypoint).
+- Autostart: the agentbox entrypoint runs `~/.config/agentbox/init.d/10-bc-watcher.sh`
+  on container boot (init-hook mechanism from agentbox PR #15; hook shipped via the
+  `david` seed branch). If the session is down, either run that hook or use the
+  Start command above.
 - It ignores comments carrying the `— Claude (agentbox)` signature, so signed
   agent comments never re-trigger it.
