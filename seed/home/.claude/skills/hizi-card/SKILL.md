@@ -143,22 +143,27 @@ reading code is not — go read the code.
 ## @claude mention watcher
 
 `scripts/watcher.sh` (bundled with this skill) polls the card table for new
-comments mentioning `@claude`, acks on the card, and spawns a detached tmux
-session (`card-<card_id>`) running `claude --dangerously-skip-permissions
-"/hizi-card <card_url> ..."` — i.e., this skill, scoped to that card.
+comments that contain a real Basecamp **@mention of the bot user** (Claude
+Agentbox, person ID `52684737`, `BOT_PERSON_ID` in the script), acks on the
+card, and spawns a detached tmux session (`card-<card_id>`) running `claude
+--dangerously-skip-permissions "/hizi-card <card_url> ..."` — i.e., this skill,
+scoped to that card. The trigger is the mention markup (a bc-attachment with
+`content-type=application/vnd.basecamp.mention` referencing the bot's Person
+gid), NOT the literal text "@claude" — typing "@claude" as plain text does
+nothing.
 
 Only mentions authored by David (person ID `31104867`, `ALLOWED_CREATOR` in
-the script) trigger a run; anyone else's `@claude` is logged and ignored,
+the script) trigger a run; a bot @mention by anyone else is logged and ignored,
 with no reply on the card.
 
 **Follow-ups / continuing a session:** to answer a clarification question,
-reply on the card with another `@claude` mention. If the card's session is
+reply on the card and **@mention the bot user again**. If the card's session is
 still alive (claude still running in its tmux pane), the watcher forwards the
 mention into that SAME session via `tmux send-keys` — so it continues with all
 its context, no restart. If that session has exited, the watcher spawns a
 fresh `card-<id>` session, and the skill re-reads the full comment thread on
-startup, so the answered question is picked up anyway. Either way, the user
-must include `@claude` in the follow-up — a bare reply does not trigger it.
+startup, so the answered question is picked up anyway. Either way, the reply
+must @mention the bot — a bare reply does not trigger it.
 
 - Start: `tmux new-session -d -s bc-watcher ~/.claude/skills/hizi-card/scripts/watcher.sh`
 - State/logs: `~/.local/state/hizi-card-watcher/` (high-water mark, processed

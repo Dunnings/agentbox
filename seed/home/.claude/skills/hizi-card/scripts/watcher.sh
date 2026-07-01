@@ -23,6 +23,10 @@ SIGNATURE='— Claude (agentbox)'
 # Only this Basecamp person may trigger runs (David's per-account person ID —
 # NOT the launchpad identity ID). Mentions by anyone else are logged + ignored.
 ALLOWED_CREATOR=31104867
+# The bot user (Claude Agentbox) — a run triggers only on a REAL Basecamp
+# @mention of this person, not the literal text "@claude". Per-account person
+# ID; mentions render as bc-attachment/content-type=…mention referencing this.
+BOT_PERSON_ID=52684737
 
 STATE_DIR=~/.local/state/hizi-card-watcher
 PROCESSED="$STATE_DIR/processed-ids"
@@ -87,15 +91,19 @@ while true; do
     [[ "$ptype" == Kanban::* ]] || continue
 
     content="$("$BC" show comment "$id" --in "$PROJECT" --jq '.data.content' 2>>"$LOG")"
-    # Trigger: mentions @claude, and isn't one of our own signed comments.
-    grep -qi '@claude' <<<"$content" || continue
+    # Trigger: a REAL Basecamp @mention of the bot user — a bc-attachment with
+    # content-type application/vnd.basecamp.mention referencing the bot's
+    # Person gid. The literal text "@claude" no longer triggers. Skip our own
+    # signed comments as a belt-and-suspenders guard.
+    grep -qF 'application/vnd.basecamp.mention' <<<"$content" || continue
+    grep -qF "bc3/Person/$BOT_PERSON_ID" <<<"$content" || continue
     grep -qF "$SIGNATURE" <<<"$content" && continue
 
     # Authorization: only David's mentions trigger a run. Others are logged
     # only — no reply on the card, and their comment text is never fed to a
     # session as an instruction.
     if [[ "$creator_id" != "$ALLOWED_CREATOR" ]]; then
-      log "ignored @claude mention by non-allowed user ${creator_name} (${creator_id}) on card $card_id ($card_title)"
+      log "ignored bot @mention by non-allowed user ${creator_name} (${creator_id}) on card $card_id ($card_title)"
       continue
     fi
 
@@ -111,7 +119,7 @@ while true; do
           "Got it — picking this up in the same session (tmux: \`$session\`). <em>$SIGNATURE</em>" \
           --in "$PROJECT" --json >/dev/null 2>>"$LOG" \
           || log "WARNING: forward-ack comment on card $card_id failed"
-        tmux send-keys -t "$session" -l "David posted a new @claude comment on the Basecamp card you are working (card $card_id). Fetch the latest comments on the card and continue the task — if you were waiting on clarification, it should now be answered. Finish per the skill's completion steps (implement + MR + comment + move card, or ask again if still blocked)."
+        tmux send-keys -t "$session" -l "David @mentioned you again on the Basecamp card you are working (card $card_id). Fetch the latest comments on the card and continue the task — if you were waiting on clarification, it should now be answered. Finish per the skill's completion steps (implement + MR + comment + move card, or ask again if still blocked)."
         tmux send-keys -t "$session" Enter
         continue
       fi
