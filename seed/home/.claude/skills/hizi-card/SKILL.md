@@ -151,6 +151,15 @@ Only mentions authored by David (person ID `31104867`, `ALLOWED_CREATOR` in
 the script) trigger a run; anyone else's `@claude` is logged and ignored,
 with no reply on the card.
 
+**Follow-ups / continuing a session:** to answer a clarification question,
+reply on the card with another `@claude` mention. If the card's session is
+still alive (claude still running in its tmux pane), the watcher forwards the
+mention into that SAME session via `tmux send-keys` — so it continues with all
+its context, no restart. If that session has exited, the watcher spawns a
+fresh `card-<id>` session, and the skill re-reads the full comment thread on
+startup, so the answered question is picked up anyway. Either way, the user
+must include `@claude` in the follow-up — a bare reply does not trigger it.
+
 - Start: `tmux new-session -d -s bc-watcher ~/.claude/skills/hizi-card/scripts/watcher.sh`
 - State/logs: `~/.local/state/hizi-card-watcher/` (high-water mark, processed
   comment IDs, `watcher.log`)

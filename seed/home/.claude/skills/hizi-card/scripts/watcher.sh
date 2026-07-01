@@ -34,6 +34,21 @@ touch "$PROCESSED"
 
 log() { printf '%s %s\n' "$(date -u +%FT%TZ)" "$*" | tee -a "$LOG"; }
 
+# Is a claude process still alive in this tmux session? Sessions are spawned
+# via `bash -c "... claude ...; exec bash"`, so claude is a child of the pane
+# process while running, and the pane degrades to a bare bash once it exits.
+claude_alive() {
+  # NB: display-message/send-keys target panes and do NOT accept tmux's "="
+  # exact-match prefix (only session-scoped commands like has-session do).
+  # Session names are distinct equal-length card-<id> strings, so a plain
+  # name can't prefix-collide here.
+  local pane_pid
+  pane_pid="$(tmux display-message -p -t "$1" '#{pane_pid}' 2>/dev/null)" || return 1
+  [[ -n "$pane_pid" ]] || return 1
+  [[ "$(ps -o comm= -p "$pane_pid" 2>/dev/null)" == claude ]] && return 0
+  pgrep -P "$pane_pid" -x claude >/dev/null 2>&1
+}
+
 # First run: start from "now" so we never chew through history.
 if [[ ! -s "$HWM_FILE" ]]; then
   date -u +%FT%T.000Z > "$HWM_FILE"
@@ -88,11 +103,20 @@ while true; do
     session="card-$card_id"
 
     if tmux has-session -t "=$session" 2>/dev/null; then
-      log "mention on card $card_id ($card_title) but session $session already running — acking only"
-      "$BC" comment "$card_id" \
-        "Already on this one — a session is running for this card (tmux: \`$session\`). <em>$SIGNATURE</em>" \
-        --in "$PROJECT" --json >/dev/null 2>>"$LOG"
-      continue
+      if claude_alive "$session"; then
+        # Forward the mention into the live session — it keeps its context.
+        # If claude is mid-turn the injected text queues as a steering message.
+        log "forwarding comment $id on card $card_id to live session $session"
+        "$BC" comment "$card_id" \
+          "Got it — picking this up in the same session (tmux: \`$session\`). <em>$SIGNATURE</em>" \
+          --in "$PROJECT" --json >/dev/null 2>>"$LOG" \
+          || log "WARNING: forward-ack comment on card $card_id failed"
+        tmux send-keys -t "$session" -l "David posted a new @claude comment on the Basecamp card you are working (card $card_id). Fetch the latest comments on the card and continue the task — if you were waiting on clarification, it should now be answered. Finish per the skill's completion steps (implement + MR + comment + move card, or ask again if still blocked)."
+        tmux send-keys -t "$session" Enter
+        continue
+      fi
+      log "session $session exists but claude is gone — replacing with a fresh session"
+      tmux kill-session -t "=$session" 2>/dev/null || true
     fi
 
     log "trigger: comment $id on card $card_id ($card_title) — spawning $session"
