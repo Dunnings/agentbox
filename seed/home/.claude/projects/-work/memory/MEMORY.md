@@ -9,3 +9,4 @@
 - [slot-backend version branches](reference_slot_backend_version_branches.md) — ship fixes to a deployed version via per-version maintenance branches (`6.1.17`) + `X.Y.Z-N` patch bumps, MR into the version branch
 - [H&W enhancement epic](project_haw_enhancement_epic.md) — 4 Hold & Win asks for the final 2 betgames games; boosters (#2+#3) shipped in MR !142, unlock-cells (#1) + collector-variants (#4) remain
 - [Basecamp CLI](reference_basecamp_cli.md) — installed + authed; binary at `~/.local/bin/basecamp`, Hölle Games account default
+- [hizi-card watcher](project_hizi_card_watcher.md) — @claude mentions on the hizi card table trigger /hizi-card via `bc-watcher` tmux session; restart it after container reboot

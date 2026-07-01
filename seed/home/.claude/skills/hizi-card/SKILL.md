@@ -100,7 +100,11 @@ reading code is not — go read the code.
 
 ### Enough info → implement
 
-1. Move the card to In progress: `$B cards move <card_id> --to 9476253323 --in 45710420 --json`
+1. Say so on the card, then move it to In progress:
+   ```bash
+   $B comment <card_id> "I have enough to implement this — working on it now, MR to follow. <em>— Claude (agentbox)</em>" --in 45710420 --json
+   $B cards move <card_id> --to 9476253323 --in 45710420 --json
+   ```
 2. Branch in a worktree off the up-to-date default branch (main checkout stays clean):
    ```bash
    cd /work/hizi/<repo> && git fetch origin
@@ -135,3 +139,18 @@ reading code is not — go read the code.
   out of sync with reality.
 - Judgment calls that didn't block you (naming, edge-case behaviour) go in the
   MR's reviewer note, not as card questions.
+
+## @claude mention watcher
+
+`scripts/watcher.sh` (bundled with this skill) polls the card table for new
+comments mentioning `@claude`, acks on the card, and spawns a detached tmux
+session (`card-<card_id>`) running `claude --dangerously-skip-permissions
+"/hizi-card <card_url> ..."` — i.e., this skill, scoped to that card.
+
+- Start: `tmux new-session -d -s bc-watcher ~/.claude/skills/hizi-card/scripts/watcher.sh`
+- State/logs: `~/.local/state/hizi-card-watcher/` (high-water mark, processed
+  comment IDs, `watcher.log`)
+- The watcher is NOT auto-started on container boot; restart it after a
+  container restart (or wire it into the agentbox entrypoint).
+- It ignores comments carrying the `— Claude (agentbox)` signature, so signed
+  agent comments never re-trigger it.
