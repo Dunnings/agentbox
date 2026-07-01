@@ -137,6 +137,20 @@ the current branch. (Because the seed overwrites counterparts on every start,
 sync before recreating the container or live-but-unsynced edits revert to the
 committed version.)
 
+### Init hooks
+
+After seeding, the entrypoint runs any executable `*.sh` files under
+`~/.config/agentbox/init.d/` (inside the container). Use this to start
+per-user background services on every boot — a tmux session running a
+watcher, a local daemon, whatever. Ship hooks via `SEED_HOME`
+(`<seed>/home/.config/agentbox/init.d/10-my-service.sh`, mode `755`) or drop
+them straight into the home volume. Hook output lands in
+`/tmp/agentbox-init.log`; a failing hook is logged but never blocks startup.
+
+The **`david`** branch uses this to autostart the hizi-card Basecamp watcher:
+`seed/home/.config/agentbox/init.d/10-bc-watcher.sh` launches it in a `tmux`
+session (`bc-watcher`) on every boot.
+
 ### Other entry points
 
 ```sh

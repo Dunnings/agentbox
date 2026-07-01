@@ -76,6 +76,21 @@ seed_dir /etc/agentbox/repo-seed-home "${HOME_DIR}"
 seed_dir /etc/agentbox/seed-home "${HOME_DIR}"
 seed_dir /etc/agentbox/seed-work  /work
 
+# --- User init hooks (optional) -----------------------------------------------
+# Run executable *.sh files under ~/.config/agentbox/init.d after seeding, so
+# a seed (or the home volume) can start per-user background services on every
+# boot — e.g. a tmux session running a watcher. Hooks run as the container
+# user with output collected in /tmp/agentbox-init.log; a failing hook is
+# logged but never blocks startup.
+if [[ -d "${HOME_DIR}/.config/agentbox/init.d" ]]; then
+  for hook in "${HOME_DIR}/.config/agentbox/init.d/"*.sh; do
+    [[ -x "$hook" ]] || continue
+    echo "[$(date -Is)] running init hook ${hook}" >> /tmp/agentbox-init.log
+    "$hook" >> /tmp/agentbox-init.log 2>&1 \
+      || { rc=$?; echo "[$(date -Is)] init hook ${hook} exited ${rc}" >> /tmp/agentbox-init.log; }
+  done
+fi
+
 # --- Claude Code context (only used if you actually run Claude Code) ---------
 # Symlink the image's CLAUDE.md into the home volume so rebuilds always pick up
 # edits. Replaces an existing symlink but won't overwrite a real file — if the
@@ -116,9 +131,11 @@ mkdir -p "${HOME_DIR}/.npm"
 if [[ -x /opt/controlplane-venv/bin/python && -f /opt/controlplane/server.py ]]; then
   (
     while true; do
+      # || capture keeps the inherited `set -e` from killing the supervisor
+      # subshell on a nonzero exit — which would silently disable restarts.
       /opt/controlplane-venv/bin/python /opt/controlplane/server.py \
-        >> /tmp/controlplane.log 2>&1
-      echo "[$(date -Is)] controlplane exited $?, restarting in 5s" \
+        >> /tmp/controlplane.log 2>&1 && rc=0 || rc=$?
+      echo "[$(date -Is)] controlplane exited ${rc}, restarting in 5s" \
         >> /tmp/controlplane.log
       sleep 5
     done
