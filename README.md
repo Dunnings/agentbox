@@ -111,6 +111,16 @@ with their permissions preserved (a `600` `.npmrc` stays `600`). It's a
 sync-on-run, so seeded files overwrite their counterparts each start, while
 anything not in the seed dir is left alone. Unset → skipped.
 
+### Init hooks
+
+After seeding, the entrypoint runs any executable `*.sh` files under
+`~/.config/agentbox/init.d/` (inside the container). Use this to start
+per-user background services on every boot — a tmux session running a
+watcher, a local daemon, whatever. Ship hooks via `SEED_HOME`
+(`<seed>/home/.config/agentbox/init.d/10-my-service.sh`, mode `755`) or drop
+them straight into the home volume. Hook output lands in
+`/tmp/agentbox-init.log`; a failing hook is logged but never blocks startup.
+
 ### Other entry points
 
 ```sh
