@@ -147,6 +147,10 @@ comments mentioning `@claude`, acks on the card, and spawns a detached tmux
 session (`card-<card_id>`) running `claude --dangerously-skip-permissions
 "/hizi-card <card_url> ..."` — i.e., this skill, scoped to that card.
 
+Only mentions authored by David (person ID `31104867`, `ALLOWED_CREATOR` in
+the script) trigger a run; anyone else's `@claude` is logged and ignored,
+with no reply on the card.
+
 - Start: `tmux new-session -d -s bc-watcher ~/.claude/skills/hizi-card/scripts/watcher.sh`
 - State/logs: `~/.local/state/hizi-card-watcher/` (high-water mark, processed
   comment IDs, `watcher.log`)

@@ -20,6 +20,9 @@ PROJECT=45710420
 ACCOUNT=4718627
 POLL_INTERVAL="${POLL_INTERVAL:-60}"
 SIGNATURE='— Claude (agentbox)'
+# Only this Basecamp person may trigger runs (David's per-account person ID —
+# NOT the launchpad identity ID). Mentions by anyone else are logged + ignored.
+ALLOWED_CREATOR=31104867
 
 STATE_DIR=~/.local/state/hizi-card-watcher
 PROCESSED="$STATE_DIR/processed-ids"
@@ -47,7 +50,8 @@ while true; do
           jq -c --arg hwm "$hwm" \
             '[.data[]? | select(.created_at > $hwm)
               | {id, created_at, card_id: .parent.id, card_title: .parent.title,
-                 parent_type: .parent.type}] | sort_by(.created_at)')" || batch='[]'
+                 parent_type: .parent.type, creator_id: .creator.id,
+                 creator_name: .creator.name}] | sort_by(.created_at)')" || batch='[]'
   [[ -z "$batch" ]] && batch='[]'
 
   while IFS= read -r c; do
@@ -57,6 +61,8 @@ while true; do
     card_id=$(jq -r '.card_id' <<<"$c")
     card_title=$(jq -r '.card_title' <<<"$c")
     ptype=$(jq -r '.parent_type' <<<"$c")
+    creator_id=$(jq -r '.creator_id' <<<"$c")
+    creator_name=$(jq -r '.creator_name' <<<"$c")
 
     # Advance the mark for every comment we've looked at, matched or not.
     [[ "$created" > "$(cat "$HWM_FILE")" ]] && printf '%s\n' "$created" > "$HWM_FILE"
@@ -69,6 +75,14 @@ while true; do
     # Trigger: mentions @claude, and isn't one of our own signed comments.
     grep -qi '@claude' <<<"$content" || continue
     grep -qF "$SIGNATURE" <<<"$content" && continue
+
+    # Authorization: only David's mentions trigger a run. Others are logged
+    # only — no reply on the card, and their comment text is never fed to a
+    # session as an instruction.
+    if [[ "$creator_id" != "$ALLOWED_CREATOR" ]]; then
+      log "ignored @claude mention by non-allowed user ${creator_name} (${creator_id}) on card $card_id ($card_title)"
+      continue
+    fi
 
     card_url="https://3.basecamp.com/$ACCOUNT/buckets/$PROJECT/card_tables/cards/$card_id"
     session="card-$card_id"
